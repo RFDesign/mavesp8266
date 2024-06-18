@@ -1494,9 +1494,7 @@ void DecodeOneMavFrame(mavlink_message_t R2Gmsg) {
 
             PackSensorTable(0x5005, 0);  // 0x5005 VelYaw
 
-            #if defined PlusVersion
-              PackSensorTable(0x50F2, 0);  // 0x50F2 VFR HUD
-            #endif
+            PackSensorTable(0x50F2, 0);  // 0x50F2 VFR HUD
           }            
           break; 
         }
