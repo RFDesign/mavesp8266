@@ -374,6 +374,54 @@ int r900x_savesingle_param_and_verify(String prefix, String ParamID, String Para
 
 //-------------------------------------------
 
+int r900x_readcachedparam(String filename, String ParameterName) {
+    // Reads a single parameter from the
+    // cached parameters file. It returns a
+    // negative number in case of failure.
+
+    // opens the file
+    File f = SPIFFS.open(filename, "r");
+    f.setTimeout(200);
+
+    if (f) {
+        int done = 0;
+
+        // Let's assume there will not be more than 100 lines,
+        // so that we can exit the loop if stuck.
+        while (done < 100){
+            String line = f.readStringUntil('\n'); // read a line, wait max 100ms.
+
+            int colon_offset = line.indexOf(":"); // it should have a colon, and an = sign
+            int equals_offset = line.indexOf("="); // it should have a colon, and an = sign
+            int eol_offset = line.indexOf("\r"); // line ends with \r\n. this finds the first of these
+
+            // if all of them is -1, it's the end of the file.
+            if (( colon_offset == -1 ) && ( equals_offset == -1 ) && ( eol_offset == -1 ) )
+                return -1;
+
+            //  if any of these is -1, it failed, just skip that line
+            if (( colon_offset == -1 ) || ( equals_offset == -1 ) || ( eol_offset == -1 ) )
+                continue;
+
+            String ParamID = line.substring(0,colon_offset);
+            String ParamNAME = line.substring(colon_offset+1,equals_offset);
+            String ParamVAL = line.substring(equals_offset+1,eol_offset); 
+
+            // if its an ATS2 or RTS0 command, skipp it, as we don't allows writes to S0
+            if ( ParamNAME == ParameterName )
+                return ParamVAL.toInt();
+        }
+
+        // No parameter could be found with a matching name
+        return -2;
+    }
+
+    // SPIFFS could not open the filename provided
+    return -3;
+}
+
+//-------------------------------------------
+
 bool r900x_saveparams(String filename) { 
 debug_serial_println(F("r900x_saveparams()"));
 // iterate over the params found in r900x_params.txt and save them to the modem as best as we can.

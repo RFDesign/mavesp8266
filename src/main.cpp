@@ -191,6 +191,7 @@ long int largest_serial_packet = 0;
 long int largest_tcp_packet = 0;
 #endif
 bool tcp_passthrumode = false;
+bool isMavlinkEnabled = true;
 
 //#define DEBUG_LOG debug_serial_println
 
@@ -336,6 +337,12 @@ void setup() {
     r900x_setup(true); // probe for 900x and if a new firware update is needed , do it.  CAUTION may hang in retries if 900x modem is NOT attached
     sport_setup();
     mav_bridges_setup();
+
+    //see if the Mavlink flag is set within the RFD900X. If we fail
+    //to read the cached value, the mavlink flag is presumed to be set
+    int mavParam = r900x_readcachedparam(RFD_LOC_PAR, F("MAVLINK"));
+    if (!mavParam) isMavlinkEnabled = false;
+
 }
 
 void client_check() { 
@@ -517,7 +524,7 @@ void loop() {
 
     delay(0);
 
-    if(!updateStatus.isUpdating()) {
+    if(isMavlinkEnabled && !updateStatus.isUpdating()) {
         force_vehicle_datastream();
         force_heartbeats();
     }
