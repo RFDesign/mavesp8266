@@ -1,3 +1,4 @@
+#include "hwdefs.h"
 #include "mavesp8266.h"
 #include "mavesp8266_parameters.h"
 #include "mavesp8266_gcs.h"
@@ -5,37 +6,45 @@
 #include "mavesp8266_httpd.h"
 #include "mavesp8266_component.h"
 #include "FS.h" // for SPIFFS acccess
+#include "LittleFS.h" // for SPIFFS access
 #include "sport.h"
 #include "txmod_debug.h"
 #include <XModem.h> // for firmware updates
-#include <ESP8266mDNS.h>
+#include <mDNS.h>
 #include <Arduino.h>
 #include "SmartSerial.h"
 #include "rfd900x.h"
 #include "led.h"
+#include "txmod_debug.h"
 
-HardwareSerial Serial9x(1); //  attached 900x device is on 'Serial' and instantiated as a Serial9x object. 
+HardwareSerial Serial9xPri(MDMUART);                                            //  attached 900x primary device is on 'Serial9xPri' and instantiated as a Serial9xPri object. 
+
 File f; // global handle use for the Xmodem upload
-XModem xmodem(&Serial, ModeXModem);
-MySerial *SmartSerial = new MySerial(&Serial9x); 
+XModem xmodem(&Serial9xPri, ModeXModem);
+MySerial *SmartSerial = new MySerial(&Serial9xPri); 
 static uint8_t r9x_sensitivity = 94; // Defaults to -105dBm seen on 64kpbs datarates
 const char * rfd_sik_sig = "RFD SiK";
+//All possible baudrates
+const int baud_list [] = {57600,115200,1200000,19200,38400,230400,460800,1000000,4800,2400,1200,9600};
+const int baud_list_size = sizeof(baud_list)/sizeof(baud_list[0]);
 
 void r900x_initiate_serials(void) {
     delay(100);
-    Serial.begin(115200); 
-    debug_init();
-
+    debug_serial_println("r900x_init Serial9xPri.begin(57600)");
+    Serial9xPri.setRxBufferSize(1024);                                         // 32K buffer, 16K not enough for 1M baud
+    Serial9xPri.begin(57600,SERIAL_8N1, rxMdmPin, txMdmPin);                    // Set the baud rate to 57600, 8 data bits, no parity, 1 stop bit
+    //Serial9xPri.setPins(rxMdmPin, txMdmPin, ctsMdmPin, rtsMdmPin);              // Set the RX and TX pins for Serial9xPri
+    //Serial9xPri.setHwFlowCtrlMode(UART_HW_FLOWCTRL_CTS_RTS);                    // Set CTS/RTS flow control for Modem
     SmartSerial->begin();
     debug_serial_println(F("doing setup()"));
 }
 
 void flush_rx_serial() {
-    while (Serial.available() ) { 
-        #ifdef DEBUG_DISABLE
-        Serial.read();
+    while (Serial9xPri.available() ) { 
+        #if !DEBUG_ENABLE
+        uart_flush_input(MDMUART);
         #else
-        char t = Serial.read();  
+        char t = Serial9xPri.read();  
         debug_serial_print(t); 
         #endif
     } // flush read buffer upto this 
@@ -44,9 +53,9 @@ void flush_rx_serial() {
 //-------------------------------------------
 int r900x_booloader_mode_sync() { 
 
-debug_serial_println(F("r900x_booloader_mode_sync()"));
-      Serial.write("U"); // autobauder
-      Serial.flush(); 
+//debug_serial_println(F("r900x_booloader_mode_sync()"));
+      //Serial9xPri.write("U");                                                      // autobauder, depricated on vl for V1.x modem
+      Serial9xPri.flush(); 
 
       int ok = SmartSerial->expect_multi3("ChipID:", "UPLOAD", "XXXXXXXXXXX",500); // we're really looking for a ChipID, but UPLOAD will do too, and XXX is an unused parameter
       if ( ok > 0 ) { 
@@ -72,8 +81,8 @@ bool enter_command_mode() {
     // find out.
     //ATI
     //RFD SiK 3.48 on RFD900X2
-    Serial.write("\r\nATI\r\n");
-    Serial.flush(); // output buffer flush
+    Serial9xPri.write("\r\nATI\r\n");
+    Serial9xPri.flush(); // output buffer flush
     delay(100);
 
     int already_commmand_mode_test = SmartSerial->expect_multi3("ATI", rfd_sik_sig, "RFD900X2", 250); // look for any of these
@@ -83,18 +92,18 @@ bool enter_command_mode() {
     if (  already_commmand_mode_test <= 0 ) {  // no match on the above 3 strings means ...
 
         // put it into command mode first....
-        Serial.write("\r\n");
-        Serial.flush();
+        Serial9xPri.write("\r\n");
+        Serial9xPri.flush();
         delay(1050); 
-        Serial.write("+++");
-        Serial.flush(); // output buffer flush
+        Serial9xPri.write("+++");
+        Serial9xPri.flush(); // output buffer flush
 
         // toggle LED to be more interesting.
         toggle_led_state();
 
         int ok2 = SmartSerial->expect_multi3("OK","+++","XXXXX",1150); // look for +++ takes 50ms, OK might take 1000 ?
         if ( ok2 == 1 ) { 
-            debug_serial_println(F("GOT OK Response from radio."));
+            //debug_serial_println(F("GOT OK Response from radio."));
             flush_rx_serial();
             return true;
         }
@@ -102,8 +111,8 @@ bool enter_command_mode() {
             // if modem echo's back the +++ we sent it, we are already in command mode.
             debug_serial_println(F("radio is already_in_cmd_mode2, continuing... sending RN."));
             delay(100);
-            Serial.write("\r\n"); // terminate the +++ command.
-            Serial.flush(); // output buffer flush
+            Serial9xPri.write("\r\n"); // terminate the +++ command.
+            Serial9xPri.flush(); // output buffer flush
             delay(100);
             //flush_rx_serial();
             return true;
@@ -148,7 +157,7 @@ bool enter_command_mode_with_retries() {
 
 // prerequisite, u should have called some form of enter_command_mode() before this one:
 int r900x_readsingle_param_impl( String prefix, String ParamID ) { 
-    debug_serial_print(F("r900x_readsingle_param_impl "));
+    //debug_serial_print(F("r900x_readsingle_param_impl "));
 
     //  read individial param first  ( eg ATS4? ) to see if it even needs changing
     String cmd = prefix+ParamID+"?\r\n"; // first \r\n is to end the +++ command we did above, if any.
@@ -170,8 +179,8 @@ int r900x_readsingle_param_impl( String prefix, String ParamID ) {
     int max = 0;
     // TODO does not handle RT&E? params. as it returns a long string with 32 hex chars.
     while (( data.length() < 10 ) && (max < 5 ) && ( data3.length() <= 2 ) )  { 
-        Serial.write(cmd.c_str());
-        Serial.flush(); // output buffer flush
+        Serial9xPri.write(cmd.c_str());
+        Serial9xPri.flush(); // output buffer flush
         data = SmartSerial->expect_s(cmd,55);  // this should capture the echo of the RTS3?
         data3 = SmartSerial->expect_s("\r\n",500);  // this should capture the line after and its contents
         // go to first character which is an number 0-9
@@ -225,8 +234,8 @@ int r900x_readsingle_param(String prefix, String ParamID) {
         // erp, should not be needed, but aparently can be...
         String exitcmd= "ATO\r\n";
         debug_serial_print(exitcmd); // debug only.
-        Serial.write(exitcmd.c_str());
-        Serial.flush(); // output buffer flush
+        Serial9xPri.write(exitcmd.c_str());
+        Serial9xPri.flush(); // output buffer flush
 
         debug_serial_print(F("r900x_readsingle_param-RETRY "));
 
@@ -291,8 +300,8 @@ int r900x_savesingle_param_and_verify_more(String prefix, String ParamID, String
                 if ( ParamID == F("&F") ) ParamCMD = prefix+ParamID+"\r\n";
 
             debug_serial_print(ParamCMD); // debug only.
-            Serial.write(ParamCMD.c_str());
-            Serial.flush(); // output buffer flush
+            Serial9xPri.write(ParamCMD.c_str());
+            Serial9xPri.flush(); // output buffer flush
             bool ok = SmartSerial->expect("OK",1000);  // needs to be bigger than 200.
             //debug_serial_println(F("7#############################################################"));
             if ( ok ) { 
@@ -331,8 +340,8 @@ int r900x_savesingle_param_and_verify_more(String prefix, String ParamID, String
             // save params AND take out of command mode via a quick reboot
             String savecmd = prefix+"&W\r\n"; // "AT&W\r\n
             debug_serial_print (savecmd); // debug only.
-            Serial.write(savecmd.c_str());
-            Serial.flush(); // output buffer flush
+            Serial9xPri.write(savecmd.c_str());
+            Serial9xPri.flush(); // output buffer flush
 
             bool ok = SmartSerial->expect("OK",1000); 
             if ( ok ) { 
@@ -342,8 +351,8 @@ int r900x_savesingle_param_and_verify_more(String prefix, String ParamID, String
                 // save params AND take out of command mode via a quick reboot
                 String rebootcmd = prefix+"Z\r\n"; // "ATZ\r\n"
                 debug_serial_print(rebootcmd); // debug only.
-                Serial.write(rebootcmd.c_str());
-                Serial.flush(); // output buffer flush
+                Serial9xPri.write(rebootcmd.c_str());
+                Serial9xPri.flush(); // output buffer flush
 
                 delay(150);
                 // TODO ? ok = SmartSerial->expect("RTZ",200);
@@ -380,7 +389,7 @@ int r900x_readcachedparam(String filename, String ParameterName) {
     // negative number in case of failure.
 
     // opens the file
-    File f = SPIFFS.open(filename, "r");
+    File f = LittleFS.open(filename, "r");
     f.setTimeout(200);
 
     if (f) {
@@ -429,14 +438,13 @@ debug_serial_println(F("r900x_saveparams()"));
 
     if ( ! enter_command_mode_with_retries() ) { return -1; } 
  
-    String localfilename = RFD_LOC_PAR;
     String remotefilename = RFD_REM_PAR;
 
-    File f = SPIFFS.open(filename, "r");    
+    File f = LittleFS.open(filename, "r");    
 
     String prefix = "AT";
     if ( filename == remotefilename ) { prefix = "RT"; } 
-
+    int NewBaud = -1;                                                           // used to keep the baud value we will set
     f.setTimeout(200); // don't wait long as it's a file object, not a serial port.
 
     if ( ! f ) {  // did we open this file ok, ie does it exist? 
@@ -477,7 +485,23 @@ debug_serial_println(F("r900x_saveparams()"));
         String ParamID = line.substring(0,colon_offset);
         String ParamNAME = line.substring(colon_offset+1,equals_offset);
         String ParamVAL = line.substring(equals_offset+1,eol_offset); 
-
+        if( ParamNAME.equals(F("SERIAL_SPEED")) ) { // we have a special case for the baud rate, as we need to set it after the save command.
+            int pVal = ParamVAL.toInt(); // save the baud rate for later
+            for(int i=0; i < baud_list_size; i++) {
+                if(pVal == (baud_list[i]/1000)) {
+                    NewBaud = baud_list[i]; // save the baud rate for later
+                    debug_serial_println("Found baud rate: " + String(NewBaud));
+                    break;
+                }
+            }
+            if(NewBaud == -1) {
+                debug_serial_println("Baud rate not found in list!");
+            }
+        }
+        if( ParamNAME.equals(F("S1BAUD")) ) { // we have a special case for the baud rate, as we need to set it after the save command.
+            NewBaud = ParamVAL.toInt(); // save the baud rate for later
+            debug_serial_println(String(F("S1BAUD: ")) + ParamVAL); // debug only.
+        }
         // if its an ATS2 or RTS0 command, skipp it, as we don't allows writes to S0
         if ( ParamID == F(PARAM_FORMAT_STR) ) { 
             debug_serial_println(F("skipping S0, as we don't write it."));
@@ -494,9 +518,9 @@ debug_serial_println(F("r900x_saveparams()"));
         // and becasue AT and RT commands are notoriously non-guaranteed.
 
         debug_serial_print(ParamCMD); // debug only.
-        Serial.write(ParamCMD.c_str());
-        Serial.flush(); // output buffer flush
-        bool ok = SmartSerial->expect("OK",200); // typically we get a remote response in under 150ms, local response under 30
+        Serial9xPri.write(ParamCMD.c_str());
+        Serial9xPri.flush(); // output buffer flush
+        bool ok = SmartSerial->expect("OK",300); // typically we get a remote response in under 150ms, local response under 30
         if ( ok ) { 
             debug_serial_println(F(" GOT OK from radio."));
             flush_rx_serial();
@@ -519,8 +543,8 @@ debug_serial_println(F("r900x_saveparams()"));
    // save params AND maybe take out of command mode via a quick reboot
     String savecmd = prefix+"&W\r\n"; // "AT&W\r\n
     debug_serial_print(savecmd); // debug only.
-    Serial.write(savecmd.c_str());
-    Serial.flush(); // output buffer flush
+    Serial9xPri.write(savecmd.c_str());
+    Serial9xPri.flush(); // output buffer flush
 
     set_led_state(false);
 
@@ -532,13 +556,19 @@ debug_serial_println(F("r900x_saveparams()"));
           // take out of command mode via a quick reboot
             String rebootcmd = prefix+"Z\r\n"; // "ATZ\r\n"
             debug_serial_println(rebootcmd); // debug only.
-            Serial.write(rebootcmd.c_str());
-            Serial.flush(); // output buffer flush
+            Serial9xPri.write(rebootcmd.c_str());
+            Serial9xPri.flush(); // output buffer flush
 
             set_led_state(0);
 
             delay(1000); // hack to allow the radio to come back and sync after a ATZ or RTZ
- 
+            // if it is the local modem with at prefix and the baud rate has changed, we need to update the saved baud rate as well update the current baud rate of the modem
+            if(prefix.equals("AT") && NewBaud != -1 && NewBaud != getWorld()->getParameters()->getUartBaudRate()) {
+                debug_serial_println("Saving serial to FLASH: " + String(NewBaud));
+                getWorld()->getParameters()->setUartBaudRate(NewBaud);
+                getWorld()->getParameters()->saveAllToEeprom();
+                Serial9xPri.begin(getWorld()->getParameters()->getUartBaudRate());// set new baud rate for uart
+            }
             //ok = SmartSerial->expect("OK",2000);  we don't expect a response from ATZ or RTZ
     } else { 
         //trying = false; HACK
@@ -565,9 +595,8 @@ bool r900x_command_mode_sync() {
 
             debug_serial_print(F("\tATI Attempt Number: ")); debug_serial_println(i);
             debug_serial_print("\tSending ATI to radio. ");
-            //
-            Serial.write("ATI\r\n");
-            Serial.flush(); // output buffer flush
+            Serial9xPri.write("ATI\r\n");
+            Serial9xPri.flush(); // output buffer flush
 
             int ok2 = SmartSerial->expect_multi3("SiK","\xC1\xE4\xE3\xF8","\xC1\xE4\xE7\xF8",2000);  // we really want to see 'Sik' here, but if we see the hex string/s we cna short-curcuit 
 
@@ -592,12 +621,12 @@ bool r900x_command_mode_sync() {
 
             debug_serial_print(F("\t\tSending AT&UPDATE to radio..."));
             //
-            Serial.write("\r\n");
+            Serial9xPri.write("\r\n");
             delay(200); 
-            Serial.flush();
-            Serial.write("AT&UPDATE\r"); // must be \r only, do NOT include \n here
+            Serial9xPri.flush();
+            Serial9xPri.write("AT&UPDATE\r"); // must be \r only, do NOT include \n here
             delay(700); 
-            Serial.flush();
+            Serial9xPri.flush();
 
             debug_serial_println(F("Sent update command"));
 
@@ -626,8 +655,8 @@ int r900x_getparams(String filename, bool factory_reset_first) {
 
     delay(1500); // give a just booted radio tim to be ready.
 
-    Serial.write("\r\n"); // after +++ we need to clear the line before we set AT commands
-    Serial.flush(); // output buffer flush
+    Serial9xPri.write("\r\n"); // after +++ we need to clear the line before we set AT commands
+    Serial9xPri.flush(); // output buffer flush
     delay(500); // give a just booted radio tim to be ready.
 
     flush_rx_serial();
@@ -642,16 +671,16 @@ int r900x_getparams(String filename, bool factory_reset_first) {
 
         String factorycmd = prefix+"&F\r\n";
         debug_serial_print(factorycmd);
-        Serial.write(factorycmd.c_str());
-        Serial.flush(); // output buffer flush
+        Serial9xPri.write(factorycmd.c_str());
+        Serial9xPri.flush(); // output buffer flush
         bool b = SmartSerial->expect("OK",200); 
         (void)b; // compiler unsed variable warning otherwise 
         flush_rx_serial();
 
         String factorycmd2 = prefix+"&W\r\n"; 
         debug_serial_print(factorycmd);
-        Serial.write(factorycmd2.c_str());
-        Serial.flush(); // output buffer flush
+        Serial9xPri.write(factorycmd2.c_str());
+        Serial9xPri.flush(); // output buffer flush
         bool b2 = SmartSerial->expect("OK",200); 
         (void)b2; // compiler unsed variable warning otherwise 
         flush_rx_serial();
@@ -668,8 +697,8 @@ int r900x_getparams(String filename, bool factory_reset_first) {
             // save params AND take out of command mode via a quick reboot
             String savecmd = prefix+"&W\r\n"; // "AT&W\r\n
             debug_serial_print(savecmd); // debug only.
-            Serial.write(savecmd.c_str());
-            Serial.flush(); // output buffer flush
+            Serial9xPri.write(savecmd.c_str());
+            Serial9xPri.flush(); // output buffer flush
 
             bool ok = SmartSerial->expect("OK",500); 
             if ( ok ) { 
@@ -692,12 +721,12 @@ int r900x_getparams(String filename, bool factory_reset_first) {
 
     // now get params list ATI5 or RTI5 as needed 
     String cmd = prefix+"I5\r\n";
-    Serial.write(cmd.c_str());
-    Serial.flush(); // output buffer flush
+    Serial9xPri.write(cmd.c_str());
+    Serial9xPri.flush(); // output buffer flush
     //debug_serial_print(F("----------------------------------------------"));
-    String data = SmartSerial->expect_s("HYSTERESIS_RSSI",1000); 
+    String data = SmartSerial->expect_s("HYSTERESIS_RSSI_dBm",1000); 
     data += SmartSerial->expect_s("\r\n",200);
-    while (Serial.available() ) { char t = Serial.read();  data += t; } // flush read buffer upto this point.
+    while (Serial9xPri.available() ) { char t = Serial9xPri.read();  data += t; } // flush read buffer upto this point.
     debug_serial_print(data);
     //debug_serial_print(F("----------------------------------------------"));
 
@@ -710,19 +739,19 @@ int r900x_getparams(String filename, bool factory_reset_first) {
     // as user experience uses the SPIFFS .txt to render the html page, we cleanup an old one if we've been asked
     // to get fresh params, even if we cant replace it, as the *absense* of it means the remote radio is 
 	// no longer connected.
-    SPIFFS.remove(filename); 
+    LittleFS.remove(filename);
 
     
     // now write params to spiffs, for user record:
     if ( data.length() > 300 ) { // typical file length is around 400chars 
-        f = SPIFFS.open(filename, "w");
+        f = LittleFS.open(filename, "w");
         data.trim();
         data += "\r\n";
         f.print(data);  //actual parm data.
 
         // tack encryption key onto the end of the param file, if it exists, instead of read from remote radio
 		// as we can't do that right now. - TODO.
-        File e = SPIFFS.open(RFD_ENC_KEY, "r");
+        File e = LittleFS.open(RFD_ENC_KEY, "r");
         String estr = "&E:ENCRYPTION_KEY="+e.readString();// entire file, includes /r/n on end.
         
         if (estr.length() > 30 && e) { // basic check, file should exist and have at least 30 bytes in it to be plausible
@@ -737,8 +766,8 @@ int r900x_getparams(String filename, bool factory_reset_first) {
 
     String vercmd = prefix+"I\r\n";  //ATI or RTI
     debug_serial_print(vercmd.c_str()); // for debug only
-    Serial.write(vercmd.c_str());
-    Serial.flush(); // output buffer flush
+    Serial9xPri.write(vercmd.c_str());
+    Serial9xPri.flush(); // output buffer flush
 
     String vers; //starts with this...
     bool ok = SmartSerial->expect(rfd_sik_sig,1500);  // we really want to see 'RFD SiK' here, 
@@ -749,8 +778,8 @@ int r900x_getparams(String filename, bool factory_reset_first) {
         debug_serial_println(F("\tGOT SiK Response from radio."));
 
         // this line *may* have started with 'RFD SiK' ( we matched on the SiK above), and end with '2.65 on RFD900X R1.3' 
-        while (Serial.available() ) { 
-            char t = Serial.read();  
+        while (Serial9xPri.available() ) { 
+            char t = Serial9xPri.read();  
             debug_serial_print(t);
             vers += t; 
         } // flush read buffer upto this point, displaying it for posterity ( it has version info )
@@ -761,7 +790,7 @@ int r900x_getparams(String filename, bool factory_reset_first) {
         // save version string to a file for later use by the webserver to present to the user.
         String vf = RFD_LOC_VER;
         if (filename == RFD_REM_PAR ) {vf = RFD_REM_VER;}
-        File v = SPIFFS.open(vf, "w"); 
+        File v = LittleFS.open(vf, "w"); 
         v.print(vers);
         v.close();
 
@@ -773,8 +802,8 @@ int r900x_getparams(String filename, bool factory_reset_first) {
 
     debug_serial_print(F("ATZ/RTZ ensures RFD900x leaves command mode "));
     cmd = prefix+"Z\r";
-    Serial.write(cmd.c_str()); // reboot radio to restore non-command mode.
-    Serial.flush(); // output buffer flush
+    Serial9xPri.write(cmd.c_str()); // reboot radio to restore non-command mode.
+    Serial9xPri.flush(); // output buffer flush
     delay(200); 
 
     debug_serial_println(F("r900x_getparams()- END\n"));
@@ -815,40 +844,40 @@ void r900x_setup(bool reflash) { // if true. it will attempt to reflash ( and fa
 
     set_led_state(0);
 
-    if ( SPIFFS.begin() ) { 
-      debug_serial_println(F("spiffs started\n"));
+    if ( LittleFS.begin() ) { 
+      debug_serial_println(F("LittleFS started\n"));
     } else { 
-      debug_serial_println(F("spiffs FAILED to start\n"));
+      debug_serial_println(F("LittleFS FAILED to start\n"));
     }
 
     //Format File System if it doesn't at least have an index.htm file on it.
-    if (!SPIFFS.exists("/index.htm")) {
-        debug_serial_println(F("SPIFFS File System Format started...."));
-        SPIFFS.format();
-        debug_serial_println(F("...SPIFFS File System Format Done."));
+    if (!LittleFS.exists("/index.htm")) {
+        debug_serial_println(F("LittleFS File System Format started...."));
+        LittleFS.format();
+        debug_serial_println(F("...LittleFS File System Format Done."));
     }
     else
     {
-        debug_serial_println(F("SPIFFS File System left as-is."));
+        debug_serial_println(F("LittleFS File System left as-is."));
     }
 
     // debug only, list files and their size-on-disk
-    debug_serial_println(F("List of files in SPIFFs:"));
-    Dir dir = SPIFFS.openDir(""); //read all files
-    while (dir.next()) {
-      debug_serial_print(dir.fileName()); debug_serial_print(F(" -> "));
-      File f = dir.openFile("r");
-      debug_serial_println(f.size());
-      f.close();
+    debug_serial_println(F("List of files in LittleFS:"));
+    File root = LittleFS.open("/");
+    while (true) {
+        File file = root.openNextFile();
+        if (!file) break; // No more files
+        debug_serial_print(file.name()); debug_serial_print(F(" -> "));
+        debug_serial_println(file.size());
+        file.close();
     }
 
     // Store pseudo-sensitivity value in the RAM to calculate RSSI
     // Pseudo-sensitivity is calculated based on RSSI value from MAV message #109:
     // pRSSI = 2*sensitivity + 304
     // Sensitivity values can be found in the RFD900x datasheet
-    File f = SPIFFS.open(RFD_LOC_PAR,"r");
-    if (f != NULL) {
-        bool as_found = false;
+    File f = LittleFS.open(RFD_LOC_PAR,"r");
+    if (f) {
         while (f.available()) {
             String line = f.readStringUntil('\n');
             int res = line.indexOf("AIR_SPEED");
@@ -862,11 +891,12 @@ void r900x_setup(bool reflash) { // if true. it will attempt to reflash ( and fa
                     case 125: r9x_sensitivity = 96; break; // -104dbm
                     case 200: 
                     case 224: 
+                    case 430: r9x_sensitivity = 116; break; // -94dBm
                     case 500: r9x_sensitivity = 116; break; // -94dBm
                     case 750: r9x_sensitivity = 126; break; // -89dBm
+                    case 1000: r9x_sensitivity = 136; break; // -84dBm
                     default: r9x_sensitivity = 94; break; // Defaults to -105dBm seen on 64kpbs datarates
                 }
-                as_found = true;
                 debug_serial_println("AS found:"+String(airspeed));
                 break;
             }
@@ -876,18 +906,18 @@ void r900x_setup(bool reflash) { // if true. it will attempt to reflash ( and fa
 
     int baudrate = getWorld()->getParameters()->getUartBaudRate();
     debug_serial_println("Loading baud from FLASH: " + String(baudrate));
-    debug_serial_println("Serial.begin("+String(baudrate)+");");
-    Serial.begin(baudrate); // // get params from modem with command-mode, without talking ot the bootloader, at stock firmware baud rate.
+    debug_serial_println("Serial9xPri.begin("+String(baudrate)+");");
+    Serial9xPri.begin(baudrate); // // get params from modem with command-mode, without talking ot the bootloader, at stock firmware baud rate.
 
-    f = SPIFFS.open(BOOTLOADERNAME, "r");
+    f = LittleFS.open(BOOTLOADERNAME, "r");
 
     // if we've got anything available to try a reflash, must be a .bin
     if ( reflash) { 
         if ( ! f ) { 
             f.close();
             //debug_serial_println("flashing with .ok firrmware....\n");
-            //f = SPIFFS.open(BOOTLOADERCOMPLETE, "r");
-            f = SPIFFS.open(BOOTLOADERNAME, "r"); // retry opening .bin file, just in case it was intermittent.
+            //f = LittleFS.open(BOOTLOADERCOMPLETE, "r");
+            f = LittleFS.open(BOOTLOADERNAME, "r"); // retry opening .bin file, just in case it was intermittent.
         }
     }
 
@@ -899,13 +929,10 @@ void r900x_setup(bool reflash) { // if true. it will attempt to reflash ( and fa
 
     if (( f.size() > 0) and (f.size() < 90000 )) { 
         debug_serial_println(F("incomplete or too-small firmware for 900x to program ( < 90k bytes ), deleting corrupted file and skipping reflash.\n"));
-        SPIFFS.remove(BOOTLOADERNAME); 
+        LittleFS.remove(BOOTLOADERNAME); 
         return;   
     } 
 
-    //All possible baudrates
-    const int baud_list [] = {57600,115200,9600,19200,38400,230400,460800,1000000,4800,2400,1200};
-    const int baud_list_size = sizeof(baud_list)/sizeof(baud_list[0]);
 
     // first try at the default baud rate...
     int result = -1; // returns 1,2,3,4 or 5 on some sort of success
@@ -934,8 +961,8 @@ void r900x_setup(bool reflash) { // if true. it will attempt to reflash ( and fa
         // this last link uses the RTOS SDK, not the arduino one, so isn't 100% accurate...
         // http://forgetfullbrain.blogspot.com/2015/08/uart-sending-and-receiving-data-using.html
 
-        debug_serial_println(F("Serial.begin(57600);"));
-        Serial.begin(57600);
+        debug_serial_println(F("r900x_setup:2 Serial9xPri.begin(57600);"));
+        Serial9xPri.begin(57600);
 
         // first try to communicate with the bootloader, if possible....
         int ok = r900x_booloader_mode_sync();
@@ -946,8 +973,8 @@ void r900x_setup(bool reflash) { // if true. it will attempt to reflash ( and fa
 
         if ( got_hex == false ) { // hack buzz temp disable, r-enable me.
             // Try with the saved baudrate first
-            debug_serial_println("Serial.begin("+String(baudrate)+");");
-            Serial.begin(baudrate);
+            debug_serial_println("r900x_setup:3 Serial9xPri.begin("+String(baudrate)+");");
+            Serial9xPri.begin(baudrate);
 
             // if that doesn't work, try to communicate with the radio firmware, and put it into AT mode...
             ok = r900x_command_mode_sync();
@@ -958,8 +985,8 @@ void r900x_setup(bool reflash) { // if true. it will attempt to reflash ( and fa
                 // Attempt entering command mode with every single baudrate
                 for (int i = 0; i < baud_list_size; i++) {
                     if (baud_list[i] != baudrate) {
-                        debug_serial_println("Serial.begin("+String(baud_list[i])+");");
-                        Serial.begin(baud_list[i]);
+                        debug_serial_println("r900x_setup:4 Serial9xPri.begin("+String(baud_list[i])+");");
+                        Serial9xPri.begin(baud_list[i]);
 
                         // if that doesn't work, try to communicate with the radio firmware, and put it into AT mode...
                         ok = r900x_command_mode_sync();
@@ -992,10 +1019,12 @@ void r900x_setup(bool reflash) { // if true. it will attempt to reflash ( and fa
 
         // if we already saw ChipID or UPLOAD output, don't try to do 
         if ( result == 9 ) {
-            Serial.begin(57600);
-            //Serial.write("U"); // AUTO BAUD RATE CODE EXPECTS THIS As the first byte sent to the bootloader, not even \r or \n should be sent earlier
-            Serial.write("\r\n");
-            Serial.flush();
+
+            debug_serial_println("r900x_setup:5 Serial9xPri.begin(57600)");
+            Serial9xPri.begin(57600);
+            //Serial9xPri.write("U"); // AUTO BAUD RATE CODE EXPECTS THIS As the first byte sent to the bootloader, not even \r or \n should be sent earlier
+            Serial9xPri.write("\r\n");
+            Serial9xPri.flush();
 
             bool ok = SmartSerial->expect("RFD900xSub:2",2000);  // response to 'U' is the long string including chipid
             // todo handle this return value. 
@@ -1010,8 +1039,8 @@ void r900x_setup(bool reflash) { // if true. it will attempt to reflash ( and fa
         // UPLOAD COMMAND EXPECTS 'Ready' string
         debug_serial_println(F("\t\tsending 'UPLOAD'\r\n"));
         //
-        Serial.write("UPLOAD\r\n");
-        Serial.flush(); // output buffer flush
+        Serial9xPri.write("UPLOAD\r\n");
+        Serial9xPri.flush(); // output buffer flush
 
         // we really MUST see Ready here
         if (SmartSerial->expect("Ready",3000)) 
@@ -1033,14 +1062,14 @@ void r900x_setup(bool reflash) { // if true. it will attempt to reflash ( and fa
                         debug_serial_println(F("ERROR! gave up on xmodem-reflash, sorry."));  
                     } else if (xok == 1) {
                         debug_serial_println(F("renamed firmware file after successful flash ( file ends in .ok now)"));
-
+                        f.close();                                              // close the file before we rename it.
                         // after flashing successfully from the .bin file, rename it
-                        SPIFFS.remove(BOOTLOADERCOMPLETE); // cleanup incase an old one is still there. 
-                        SPIFFS.rename(BOOTLOADERNAME, BOOTLOADERCOMPLETE); // after a successful upload to the 900x radio, rename it out of the 
-
+                        LittleFS.remove(BOOTLOADERCOMPLETE); // cleanup incase an old one is still there. 
+                        LittleFS.rename(BOOTLOADERNAME, BOOTLOADERCOMPLETE); // after a successful upload to the 900x radio, rename it out of the 
+                        
                         debug_serial_println(F("Booting new firmware"));
-                        Serial.write("BOOTNEW\r");
-                        Serial.flush();
+                        Serial9xPri.write("BOOTNEW\r");
+                        Serial9xPri.flush();
                         debug_serial_println(F("\t\tBOOTNEW\r\n"));     
                         break;
                     }                
@@ -1058,8 +1087,8 @@ void r900x_setup(bool reflash) { // if true. it will attempt to reflash ( and fa
         }      
 
         debug_serial_println(F("Booting firmware"));
-        Serial.write("BOOTNEW\r");
-        Serial.flush();
+        Serial9xPri.write("BOOTNEW\r");
+        Serial9xPri.flush();
         debug_serial_println(F("\t\tBOOTNEW\r\n")); 
 
         flush_rx_serial();
@@ -1067,10 +1096,10 @@ void r900x_setup(bool reflash) { // if true. it will attempt to reflash ( and fa
 
     baudrate = getWorld()->getParameters()->getUartBaudRate();
     debug_serial_print("Loading baud from FLASH: " + String(baudrate));
-    debug_serial_println("Serial.begin("+String(baudrate)+");");
-    Serial.begin(baudrate); // // get params from modem with command-mode, without talking ot the bootloader, at stock firmware baud rate.
+    debug_serial_println("r900x_setup:6 Serial9xPri.begin("+String(baudrate)+");");
+    Serial9xPri.begin(baudrate); // // get params from modem with command-mode, without talking ot the bootloader, at stock firmware baud rate.
     flush_rx_serial();
-    Serial.flush();
+    Serial9xPri.flush();
 
     //we put a AT&F here to factory-reset the modem after the reflash and before we get params from it
     
@@ -1088,22 +1117,22 @@ void r900x_attempt_factory_reset(void) {
             bool success = false;
             debug_serial_println(F("attempting AT&F"));
             String factorycmd = "AT&F\r\n";
-            Serial.write(factorycmd.c_str());
-            Serial.flush(); // output buffer flush
+            Serial9xPri.write(factorycmd.c_str());
+            Serial9xPri.flush(); // output buffer flush
             if (SmartSerial->expect("OK",250)) {
                 flush_rx_serial();
 
                 for (uint8_t tries_w = 0; tries_w < 5; tries_w++) {
                     debug_serial_println(F("attempting AT&W"));
                     String factorycmd2 = "AT&W\r\n"; 
-                    Serial.write(factorycmd2.c_str());
-                    Serial.flush(); // output buffer flush
+                    Serial9xPri.write(factorycmd2.c_str());
+                    Serial9xPri.flush(); // output buffer flush
                     if (SmartSerial->expect("OK",250)) {
                         flush_rx_serial();
                         debug_serial_println(F("Sending ATZ"));
                         String factorycmd2 = "ATZ\r\n"; 
-                        Serial.write(factorycmd2.c_str());
-                        Serial.flush(); // output buffer flush
+                        Serial9xPri.write(factorycmd2.c_str());
+                        Serial9xPri.flush(); // output buffer flush
                         flush_rx_serial();
                         success = true;
                         break;

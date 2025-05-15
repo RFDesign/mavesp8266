@@ -38,6 +38,7 @@
 #ifndef MAVESP8266_COMPONENT_H
 #define MAVESP8266_COMPONENT_H
 
+#include "hwdefs.h"
 #include "mavesp8266.h"
 
 class MavESP8266Component {

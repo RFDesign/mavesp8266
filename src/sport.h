@@ -8,6 +8,7 @@ v2.56.1  2020-02-26 Add web interface to allow settings/parameter changes
 v2.56.2  2020-02-27 STM32F103C / Blue Pill / Maple Mini deprecated. Tidy up Teensy3.x warnings.             
 */
 
+#include "hwdefs.h"
 #include "mavesp8266.h"
 
 void sport_setup();
@@ -85,7 +86,7 @@ void sport_handle_mavlink(mavlink_message_t * msg);
 //#define Battery_mAh_Source  3         // Define battery mAh in the LUA script on the Taranis/Horus - Recommended
 
 
-#define SPort_Serial        1         // Teensy port1=pin1, port3=pin8. The default is Serial 1, but 3 is possible 
+#define SPort_Serial        FRUART         // Teensy port1=pin1, port3=pin8. The default is Serial 1, but 3 is possible 
 
 
 
@@ -114,13 +115,13 @@ void sport_handle_mavlink(mavlink_message_t * msg);
 //=================================================================================================                             
 //                          S E L E C T   E S P   B O A R D   V A R I A N T   
 //=================================================================================================
-//#define ESP32_Variant     1    //  ESP32 Dev Module - there are several sub-variants that work
+#define ESP32_Variant     1    //  ESP32 Dev Module - there are several sub-variants that work
 //#define ESP32_Variant     2    //  Wemos® LOLIN ESP32-WROOM-32_OLED_Dual_26p
 //#define ESP32_Variant     3    //  Dragonlink V3 slim with internal ESP32 - contributed by Noircogi
-#define ESP32_Variant     4    //  Heltec Wifi Kit 32 - contributed by Noircogi
+//#define ESP32_Variant     4    //  Heltec Wifi Kit 32 - contributed by Noircogi
 
 //#define ESP8266_Variant   1   // NodeMCU ESP 12F - choose "NodeMCU 1.0(ESP-12E)" board in the IDE
-#define ESP8266_Variant   2   // ESP-F Use me for RFD900X TX-MOD - use generic ESP8266 board on IDE
+//#define ESP8266_Variant   2   // ESP-F Use me for RFD900X TX-MOD - use generic ESP8266 board on IDE
 
 
 
@@ -200,13 +201,15 @@ void sport_handle_mavlink(mavlink_message_t * msg);
 
   #if (defined ESP32)
     #ifndef WiFi_Mode 
-      #error Please define WiFi_Mode
+      //#error Please define WiFi_Mode
+      #define WiFi_Mode DEFAULT_WIFI_MODE
     #endif
   #endif  
 
   #if (defined ESP32)
     #ifndef WiFi_Protocol
-      #error Please define WiFi_Protocol
+        //#error Please define WiFi_Protocol
+        #define WiFi_Protocol WIFI_AP
     #endif
   #endif
 
@@ -312,13 +315,11 @@ void sport_handle_mavlink(mavlink_message_t * msg);
     static const uint8_t D9   = 3;    // RXD0
     static const uint8_t D10  = 1;    // TXD0*/
 
-    #define MavStatusLed  D7        // Mavlink Status LED
+    #define MavStatusLed  StatLEDPin// Mavlink Status LED
     #define BufStatusLed  99        // None
     //                    D4        // TXD1 - Serial1 default debug log out                            
-    #define FC_Mav_rxPin  D9        // RXD0 default  
-    #define FC_Mav_txPin  D10       // TXD0 default    
-    #define Fr_rxPin      D5        // SPort - Not used in single wire mode
-    #define Fr_txPin      D2        // SPort half-duplex inverted - Use me 
+    #define Fr_rxPin      rxFrPin   // SPort - Not used in single wire mode
+    #define Fr_txPin      txFrPin   // SPort half-duplex inverted - Use me  TODO need to update pin defs
 
   //=================================================================================================   
   //                            E E P R O M    S U P P O R T   -   ESP Only - for now
@@ -335,6 +336,7 @@ void sport_handle_mavlink(mavlink_message_t * msg);
   #if 0//(defined ESP32)  || (defined ESP8266)
 
     #include <FS.h>
+    #include <LittleFS.h> // SPIFFS access
     #include <SD.h>
     #include <SPI.h>
     #define SD_Libs_Loaded 

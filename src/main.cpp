@@ -39,6 +39,7 @@
 
 
 #include "rfd900x.h"
+#include "hwdefs.h"
 #include "mavesp8266.h"
 #include "mavesp8266_parameters.h"
 #include "mavesp8266_gcs.h"
@@ -46,17 +47,19 @@
 #include "mavesp8266_httpd.h"
 #include "mavesp8266_component.h"
 #include "FS.h" // for SPIFFS acccess
+#include "LittleFS.h" // for SPIFFS access
 #include "sport.h"
 #include "txmod_debug.h"
 #include <XModem.h> // for firmware updates
-#include <ESP8266mDNS.h>
+#include <ESPmDNS.h>
 #include "led.h"
+#include "esp_wifi.h"
+
 
 // txmod reset button 
-#define RESETGPIO 12
 #define MAV_HEARTBEAT_PERIOD_MS 1000
 #define TCP_CLIENT_CHECK_PERIOD_MS 200
-
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
 // platformio doesn't seem to have F(), but has FPSTR and PSTR
 #define F(string_literal) (FPSTR(PSTR(string_literal)))
 
@@ -119,28 +122,28 @@ MavESP8266World* getWorld()
     return &World;
 }
 
-uint8 client_count = 0;
+uint8_t client_count = 0;
 
 //---------------------------------------------------------------------------------
 //-- Wait for a DHCPD client
 void wait_for_client() {
     set_led_state(true);
     DEBUG_LOG("Waiting for a client...\n");
-#ifdef ENABLE_DEBUG
+#if ENABLE_DEBUG
     int wcount = 0;
 #endif
-    uint8 client_count = wifi_softap_get_station_num();
+    uint8_t client_count = WiFi.softAPgetStationNum();
     while (!client_count) {
-#ifdef ENABLE_DEBUG
-        Serial1.print(".");
+#if ENABLE_DEBUG
+        dbgSer.print(".");
         if(++wcount > 80) {
             wcount = 0;
-            Serial1.println();
+            dbgSer.println();
         }
 #endif
         delay(1000);
         toggle_led_state();
-        client_count = wifi_softap_get_station_num();
+        client_count = WiFi.softAPgetStationNum();
     }
     DEBUG_LOG("Got %d client(s)\n", client_count);
     set_led_state(false);
@@ -166,19 +169,26 @@ void IRAM_ATTR count_interrupts() {
 } 
 
 #define PROTOCOL_TCP
+#define TCP_PORT_MAIN 23
+#define TCP_PORT_AUX 24
 
 #ifdef PROTOCOL_TCP
 #include <WiFiClient.h>
-WiFiServer tcpserver(23);
-WiFiClient tcpclient;
+WiFiServer TCPServerMain(TCP_PORT_MAIN);
+WiFiServer TCPServerAux(TCP_PORT_AUX);
+WiFiClient TCPClientMain;
+WiFiClient TCPClientAux;
 
-#define bufferSize 512  
-#define packTimeout 1
-#define max_tcp_size 500 // never SEND any tcp packet over this size
-#define max_serial_size 128 // never SEND any serial chunk over this size
+HardwareSerial Serial9xAux(AUXUART);                                            // Serial9xAux is the serial port for the RFD900x auxiliary port
+
+#define MAINBUFFSIZE 1024
+#define AUXBUFFSIZE 32768
 
 // raw serial<->tcp passthrough buffers, if used.
-uint8_t buf[bufferSize];
+uint8_t bufMain[MAINBUFFSIZE];
+uint16_t bufMainLen = 0;
+uint8_t bufAux[AUXBUFFSIZE];
+uint16_t bufAuxLen = 0;
 
 // variables for tcp-serial passthrough stats
 long unsigned int msecs_counter = 0;
@@ -190,8 +200,9 @@ long int stats_tcp_pkts = 0;
 long int largest_serial_packet = 0;
 long int largest_tcp_packet = 0;
 #endif
-bool tcp_passthrumode = false;
 bool isMavlinkEnabled = true;
+bool isMainTCP=false;
+
 
 //#define DEBUG_LOG debug_serial_println
 
@@ -219,21 +230,19 @@ void mav_bridges_setup() {
 //---------------------------------------------------------------------------------
 //-- Set things up
 void setup() {
+    debug_init();
+    Serial9xAux.setRxBufferSize(AUXBUFFSIZE);                                   // 32K buffer, 16K not enough for 1M baud
+    Serial9xAux.begin(1000000,SERIAL_8N1, rxAuxPin, txAuxPin);                  // Set the baud rate to 57600, 8 data bits, no parity, 1 stop bit
+    // Serial9xAux.setPins(rxAuxPin, txAuxPin, ctsAuxPin, rtsAuxPin);              // Set the RX and TX pins for Serial9xAux
+    // Serial9xAux.setHwFlowCtrlMode(UART_HW_FLOWCTRL_CTS_RTS);                    // Set CTS/RTS flow control for Modem
+    debug_println(F("Serial9xAux started @ 1M baud"));
     r900x_initiate_serials();
     Parameters.begin();
-
-#ifdef ENABLE_DEBUG
-    //   We only use it for non debug because GPIO02 is used as a serial
-    //   pin (TX) when debugging.
-    Serial1.begin(57600);
-    debug_serial_println(F("Serial1 output for DEBUG"));
-#else
     setup_led(); 
     set_led_state(true);
     //-- Initialized RESETGPIO (Used for "Reset To Factory") 
     pinMode(RESETGPIO, INPUT_PULLUP); 
     attachInterrupt(RESETGPIO, count_interrupts, FALLING); 
-#endif
 
     DEBUG_LOG("\nConfiguring access point...\n");
     DEBUG_LOG("Free Sketch Space: %u\n", ESP.getFreeSketchSpace());
@@ -253,6 +262,9 @@ void setup() {
     //-- MDNS
     char mdnsName[256];
     sprintf(mdnsName, "TXMOD-%s",mac_half_s.c_str());
+    // Parameters.setWifiMode(WIFI_MODE_STA);
+    // Parameters.setWifiStaPassword("RFD41187@");
+    // Parameters.setWifiStaSsid("RFD");
 
     if(Parameters.getWifiMode() == WIFI_MODE_STA){
         DEBUG_LOG("\nEntering station mode...\n");
@@ -262,11 +274,11 @@ void setup() {
         char * pwd = Parameters.getWifiStaPassword();
         pwd = strlen(pwd) < 8 ? NULL : pwd;
         WiFi.begin(Parameters.getWifiStaSsid(), pwd);
-
+        
         //-- Wait a minute to connect
         for(int i = 0; i < 120 && WiFi.status() != WL_CONNECTED; i++) {
-            #ifdef ENABLE_DEBUG
-            //Serial.print(".");
+            #if ENABLE_DEBUG
+            dbgSer.print(".");
             #endif
             delay(500);
             toggle_led_state();
@@ -280,6 +292,9 @@ void setup() {
             set_led_state(true);
             WiFi.disconnect(true);
             Parameters.setWifiMode(WIFI_MODE_AP);
+            #if ENABLE_DEBUG
+            dbgSer.println("Couldn't connect to Wireless network, falling back to AP mode");
+            #endif
         }
     }
 
@@ -296,15 +311,16 @@ void setup() {
         DEBUG_LOG("\nEntering AP mode...\n");
         //-- Start AP
         WiFi.mode(WIFI_AP);
-        WiFi.encryptionType(AUTH_WPA2_PSK);
+        WiFi.encryptionType(WIFI_AUTH_WPA2_PSK);
         WiFi.softAP(Parameters.getWifiSsid(), Parameters.getWifiPassword(), Parameters.getWifiChannel());
         localIP = WiFi.softAPIP();
         //wait_for_client();
     }
 
-    //-- Boost power to Max
-    WiFi.setOutputPower(20.5);
-
+    //-- don't touch tx power or even read it as it causes packet loss
+    // WiFi.setTxPower((wifi_power_t)50);WIFI_POWER_13dBm);//WIFI_POWER_19_5dBm);
+    //esp_wifi_set_max_tx_power(50);
+    MDNS.begin(mdnsName);
     int retries = 5;
     while ( retries > 0) { 
        bool success = MDNS.begin(mdnsName);
@@ -319,8 +335,11 @@ void setup() {
     //MDNS.addService("tcp", "tcp", 23);
 
     #ifdef PROTOCOL_TCP
-    debug_serial_println(F("Starting TCP Server on port 23"));
-    tcpserver.begin(); // start TCP server 
+    debug_serial_println(F("Starting TCP Server on port 23/24"));
+    TCPServerMain.begin();                                                      // start TCP server 
+    TCPServerMain.setNoDelay(true);                                             // disable Nagle's algorithm
+    TCPServerAux.begin();                                                       // start TCP server
+    TCPServerAux.setNoDelay(true);                                              // disable Nagle's algorithm
     #endif
 
     //-- Initialize Comm Links
@@ -333,7 +352,6 @@ void setup() {
     updateServer.begin(&updateStatus); 
 
     //try at current/stock baud rate, 57600, first.
-    debug_init();
     r900x_setup(true); // probe for 900x and if a new firware update is needed , do it.  CAUTION may hang in retries if 900x modem is NOT attached
     sport_setup();
     mav_bridges_setup();
@@ -346,67 +364,82 @@ void setup() {
 }
 
 void client_check() { 
-    uint8 x = wifi_softap_get_station_num();
+    uint8_t x = WiFi.softAPgetStationNum();
     if ( client_count != x ) { 
         client_count = x;
         DEBUG_LOG("Got %d client(s)\n", client_count);  
     } 
 } 
-
-bool tcp_check() { 
-#ifdef PROTOCOL_TCP
-
-    if (!tcpclient.connected()) { 
-        tcpclient = tcpserver.available();
-        return (bool)tcpclient;
+static inline bool MainTCPCheck() { 
+    if (!TCPClientMain.connected()) { 
+        TCPClientMain = TCPServerMain.available();
+        return (bool)TCPClientMain;
     } else { 
         return true;
     }
-#endif
-    return false;  // if compiled without tcp, always return false.
 } 
 
-void handle_tcp_and_serial_passthrough() {
+static inline bool AuxTCPCheck() { 
+    if (!TCPClientAux.connected()) { 
+        TCPClientAux = TCPServerAux.available();
+        return (bool)TCPClientAux;
+    } else { 
+        return true;
+    }
+}
 
+static inline void MainTCPSerPassThru() {
     #ifdef PROTOCOL_TCP
-
-        if ( millis() > msecs_counter +1000 ) { 
-            msecs_counter = millis(); 
-            secs++;
-
-            stats_serial_in=0;
-            stats_tcp_in=0;
-            stats_serial_pkts=0;
-            stats_tcp_pkts=0;
-        }
-
-        if(int avail = tcpclient.available()) {
-            int bytes_read = 0;
-            for (int i = 0; (i < avail) && (i < max_tcp_size); i++) {
-                buf[i] = (char)tcpclient.read(); // read char from UART
-                stats_tcp_in++;
-                bytes_read++;
+    uint16_t Avail = TCPClientMain.available();                                 // check how many bytes are available on TCP
+    if(Avail) {                                                                 // if bytes are available
+        uint16_t Space = Serial9xPri.availableForWrite();                       // check how many bytes are available on uart
+        if(Space){
+            if(Avail > Space) Avail = Space;                                    // if more than bufferSize, set to bufferSize
+            if(Avail > MAINBUFFSIZE) Avail = MAINBUFFSIZE;                      // if more than bufferSize, set to bufferSize   
+            bufMainLen = TCPClientMain.read(bufMain, Avail);                    // read all available bytes from TCP @ once so don't waste time
+            if(bufMainLen){                                                     // if bytes were read    
+                Serial9xPri.write((char*)bufMain, bufMainLen);                  // write bytes to UART
             }
-
-            Serial.write(buf, bytes_read); 
-            stats_serial_pkts++; 
-            if ( avail > largest_tcp_packet ) largest_tcp_packet = avail;
         }
+    }
 
-        if(int avail = Serial.available()) {
-            int bytes_read = 0;
-            for (int i = 0; (i < avail) && (i < max_tcp_size); i++) {
-                buf[i] = (char)Serial.read(); // read char from UART
-                stats_serial_in++;
-                bytes_read++;
+    Avail = Serial9xPri.available();                               // check how many bytes are available on uart
+    if(Avail) {                                                             // if bytes are available
+        if(Avail > MAINBUFFSIZE) Avail = MAINBUFFSIZE;                      // if more than bufferSize, set to bufferSize   
+        bufMainLen  = Serial9xPri.read(bufMain, Avail);                     // read all available bytes from UART @ once so don't waste time
+        if(bufMainLen){                                                     // if bytes were read    
+            TCPClientMain.write((char*)bufMain, bufMainLen);                // write bytes to TCP client
+            //stats_serial_in += bytes_read;
+            //stats_tcp_pkts++;
+            //if (bytes_read > largest_serial_packet) largest_serial_packet = avail;
+            //Vehicle.parseMessage(bufMainLen, bufMain);                          // process messages for sport and other stuff
+        }
+    }
+    #endif
+}
+
+static inline void AuxTCPSerPassThru() {                                        // video link data, do not parse just transfer accross
+    #ifdef PROTOCOL_TCP
+    uint16_t Avail = TCPClientAux.available();
+    if(Avail) {                                                                 // if bytes are available
+        uint16_t Space = Serial9xAux.availableForWrite();                       // check how many bytes are available on uart
+        if(Space){
+            if(Avail > Space) Avail = Space;                                    // if more than bufferSize, set to bufferSize
+            if(Avail > AUXBUFFSIZE) Avail = AUXBUFFSIZE;                         // if more than bufferSize, set to bufferSize
+            bufAuxLen = TCPClientAux.read(bufAux, Avail);                       // read all available bytes from TCP @ once so don't waste time
+            if(bufAuxLen){                                                      // if bytes were read    
+                Serial9xAux.write((char*)bufAux, bufAuxLen);                    // write bytes to UART
             }
-
-            Vehicle.parseMessage(avail, buf);
-
-            tcpclient.write((char*)buf, bytes_read);
-            stats_tcp_pkts++;
-            if (avail > largest_serial_packet) largest_serial_packet = avail;
         }
+    }
+    Avail = Serial9xAux.available();                                            // check how many bytes are available on uart
+    if(Avail) {                                                                 // if bytes are available
+        if(Avail > AUXBUFFSIZE) Avail = AUXBUFFSIZE;                            // if more than bufferSize, set to bufferSize   
+        bufAuxLen = Serial9xAux.read(bufAux, Avail);                            // read all available bytes from UART @ once so don't waste time
+        if(bufAuxLen){                                                          // if bytes were read    
+            TCPClientAux.write((char*)bufAux, bufAuxLen);                       // write bytes to TCP client
+        }
+    }
     #endif
 }
 
@@ -486,75 +519,96 @@ void force_vehicle_datastream(){
 
 //---------------------------------------------------------------------------------
 //-- Main Loop
-void loop() {
-    static long time_next = 0;
+static inline bool AuxTCPCheck();
+static inline void AuxTCPSerPassThru();
+static inline bool MainTCPCheck();
+static inline void MainTCPSerPassThru();
 
-    if(millis() > time_next){
-        time_next = millis() + TCP_CLIENT_CHECK_PERIOD_MS;
-        client_check();
+// the main loop will need to poll 2 serial ports,
+// the main serial port will be telemetry data and the aux port will be video data
+// video data is too much to be parsed so just send it directly without any parsing.
+// telemetry data will be parsed and processed for sport data as before
+// tcp port for video will be read and not parsed, although at this point it probably
+// won't be used.
+// tcp for telemetry will be handled as before and sent to the main serial port
+void loop() {
+
+    // static unsigned long time_next = 0;
+    // if(millis() > time_next){
+    //     time_next = millis() + TCP_CLIENT_CHECK_PERIOD_MS;
+    //     client_check();
+    
+    static bool isAuxTCP=false;
+    if(AuxTCPCheck()){
+       if(!isAuxTCP){
+            debug_serial_println(F("Aux TCP client connected"));
+            isAuxTCP = true;
+        }
+        AuxTCPSerPassThru();        
+    } else {
+        if(isAuxTCP){
+            debug_serial_println(F("Aux TCP client disconnected"));
+            isAuxTCP = false;
+        }
     }
 
-    if (tcp_check() ) {  // if a client connects to the tcp server, stop doing everything else and handle that
-        if ( tcp_passthrumode == false ) {
-            tcp_passthrumode = true;
-            debug_serial_println(F("entered tcp-serial passthrough mode")); 
+    if (MainTCPCheck() ) {  // if a client connects to the tcp server, stop doing everything else and handle that
+        if ( isMainTCP == false ) {
+            isMainTCP = true;
+            debug_serial_println(F("Main TCP client connected")); 
         }
-        handle_tcp_and_serial_passthrough();
-
+        MainTCPSerPassThru();
     } else { // do udp & mavlink comms by default and when no tcp clients are available
 
-        if ( tcp_passthrumode == true ) { 
-            tcp_passthrumode = false; 
-            debug_serial_println(F("exited tcp-serial passthrough mode")); 
+        if ( isMainTCP == true ) { 
+            isMainTCP = false; 
+            debug_serial_println(F("Main TCP client disconnected")); 
         }
 
-        if(!updateStatus.isUpdating()) {
-            if (Component.inRawMode()) {
-                GCS.readMessageRaw();
-                delay(0);
-                Vehicle.readMessageRaw();
-            } else {
-                GCS.readMessage();
-                delay(0);
-                Vehicle.readMessage();
-                toggle_led_state();
-            }
-        }
+        // if(!updateStatus.isUpdating()) {
+        //     if (Component.inRawMode()) {
+        //         GCS.readMessageRaw();
+        //         delay(0);
+        //         //Vehicle.readMessageRaw();
+        //     } else {
+        //         GCS.readMessage();
+        //         delay(0);
+        //         //Vehicle.readMessage();// TODO add back later after testing
+        //         toggle_led_state();
+        //     }
+        // }
     }
+    //delay(0);
+    //  if(isMavlinkEnabled && !updateStatus.isUpdating()) {  //TODO put back in later once we can fix the issues with parsing messages
+    //      force_vehicle_datastream();
+    //      force_heartbeats();
+    //  }
 
-    delay(0);
+    //updateServer.checkUpdates(); // aka webserver.handleClient()
+    // MDNS.update();TODO is there an equivalent?
 
-    if(isMavlinkEnabled && !updateStatus.isUpdating()) {
-        force_vehicle_datastream();
-        force_heartbeats();
-    }
 
-    updateServer.checkUpdates(); // aka webserver.handleClient()
+    //delay(0);
 
-    MDNS.update();
+    // if (factory_reset_req) {
 
-    delay(0);
+    //     debug_serial_println(F("attempting factory reset"));
 
-    if (factory_reset_req) {
+    //     r900x_attempt_factory_reset();
 
-        debug_serial_println(F("attempting factory reset"));
-
-        r900x_attempt_factory_reset();
-
-        SPIFFS.remove(RFD_ENC_KEY);
-        SPIFFS.remove(RFD_REM_PAR);
-        SPIFFS.remove(RFD_LOC_PAR);
-        SPIFFS.remove(RFD_REM_VER);
-        SPIFFS.remove(RFD_LOC_VER);
+    //     LittleFS.remove(RFD_ENC_KEY);
+    //     LittleFS.remove(RFD_REM_PAR);
+    //     LittleFS.remove(RFD_LOC_PAR);
+    //     LittleFS.remove(RFD_REM_VER);
+    //     LittleFS.remove(RFD_LOC_VER);
         
-        set_led_state(true);
-        Parameters.resetToDefaults();
-        Parameters.saveAllToEeprom();
+    //     set_led_state(true);
+    //     Parameters.resetToDefaults();
+    //     Parameters.saveAllToEeprom();
         
-        debug_serial_println(F("FACTORY RESET BUTTON PRESSED - wifi params defaulted!\n"));
+    //     debug_serial_println(F("FACTORY RESET BUTTON PRESSED - wifi params defaulted!\n"));
 
-        ESP.reset();
-    }
-
-    if (getWorld()->getParameters()->getSPORTenable()) sport_loop();
+    //     ESP.restart();
+    // }
+    //if (getWorld()->getParameters()->getSPORTenable()) sport_loop();
 }

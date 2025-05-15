@@ -14,6 +14,6 @@ void webdebug_init() {
 
 void webdebug_publish(char * message, int len) {
     debugserver.beginPacket(bip, debugport);
-    debugserver.write(message, len);
+    debugserver.write((const uint8_t *)message, len);
     debugserver.endPacket();
 }

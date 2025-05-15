@@ -41,6 +41,7 @@
 //-- UDP Outgoing buffer timeout
 #define UDP_QUEUE_TIMEOUT       5 // 5ms
 
+#include "hwdefs.h"
 #include "mavesp8266.h"
 
 class MavESP8266GCS : public MavESP8266Bridge {

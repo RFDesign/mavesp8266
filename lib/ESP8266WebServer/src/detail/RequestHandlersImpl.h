@@ -5,6 +5,7 @@
 #include "RequestHandler.h"
 #include "mimetable.h"
 #include "WString.h"
+//#include "..\..\src\hwdefs.h"
 
 using namespace mime;
 
@@ -71,7 +72,7 @@ public:
     , _cache_header(cache_header)
     {
         _isFile = fs.exists(path);
-        DEBUGV("StaticRequestHandler: path=%s uri=%s isFile=%d, cache_header=%s\r\n", path, uri, _isFile, cache_header);
+        //dbgSer.printf("StaticRequestHandler: path= %s uri=%s isFile=%d, cache_header=%s\r\n", path, uri, _isFile, cache_header);
         _baseUriLength = _uri.length();
     }
 
@@ -89,7 +90,7 @@ public:
         if (!canHandle(requestMethod, requestUri))
             return false;
 
-        DEBUGV("StaticRequestHandler::handle: request=%s _uri=%s\r\n", requestUri.c_str(), _uri.c_str());
+        //dbgSer.printf("StaticRequestHandler::handle: request=%s _uri=%s\r\n", requestUri.c_str(), _uri.c_str());
 
         String path(_path);
 
@@ -106,7 +107,7 @@ public:
                 path += "l";
             }
         }
-        DEBUGV("StaticRequestHandler::handle: path=%s, isFile=%d\r\n", path.c_str(), _isFile);
+        //dbgSer.printf("StaticRequestHandler::handle: path=%s, isFile=%d\r\n", path.c_str(), _isFile);
 
         String contentType = getContentType(path);
 

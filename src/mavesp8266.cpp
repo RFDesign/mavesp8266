@@ -35,6 +35,7 @@
  * @author Gus Grubba <mavlink@grubba.com>
  */
 
+#include "hwdefs.h"
 #include "mavesp8266.h"
 #include "mavesp8266_parameters.h"
 
@@ -107,9 +108,9 @@ MavESP8266Log::log(const char *format, ...) {
     va_list arg;
     va_start(arg, format);
     char temp[1024];
-    size_t len = ets_vsnprintf(temp, 1024, format, arg);
-#ifdef ENABLE_DEBUG
-    Serial1.print(temp);
+    size_t len = vsnprintf(temp, 1024, format, arg);
+#if ENABLE_DEBUG
+    dbgSer.print(temp);
 #endif
 #ifdef ENABLE_SOFTDEBUG
     debug_serial_print(temp);

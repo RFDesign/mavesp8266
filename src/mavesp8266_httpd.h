@@ -38,6 +38,7 @@
 #ifndef MAVESP8266_HTTPD_H
 #define MAVESP8266_HTTPD_H
 
+#include "hwdefs.h"
 #include "mavesp8266.h"
 
 #define RFD_LOC_PAR "/r900x_params.txt"

@@ -35,6 +35,7 @@
  * @author Gus Grubba <mavlink@grubba.com>
  */
 
+#include "hwdefs.h"
 #include "mavesp8266.h"
 #include "mavesp8266_component.h"
 #include "mavesp8266_parameters.h"
@@ -323,5 +324,5 @@ MavESP8266Component::_wifiReboot(MavESP8266Bridge* sender)
 {
     _sendStatusMessage(sender, MAV_SEVERITY_NOTICE, "Rebooting WiFi Bridge.");
     delay(50);
-    ESP.reset();
+    ESP.restart();
 }

@@ -28,6 +28,8 @@
 #include "ESP8266WebServer.h"
 #include "FS.h"
 #include "detail/RequestHandlersImpl.h"
+#include <MD5Builder.h>
+
 
 #define F(string_literal) (FPSTR(PSTR(string_literal)))
 
@@ -35,7 +37,7 @@
 #ifdef DEBUG_ESP_PORT
 #define DEBUG_OUTPUT DEBUG_ESP_PORT
 #else
-#define DEBUG_OUTPUT Serial
+#define DEBUG_OUTPUT dbgSer
 #endif
 
 static const char AUTHORIZATION_HEADER[] PROGMEM = "Authorization";
@@ -241,7 +243,7 @@ String ESP8266WebServerTemplate<ServerType>::_getRandomHexString() {
   char buffer[33];  // buffer to hold 32 Hex Digit + /0
   int i;
   for(i = 0; i < 4; i++) {
-    sprintf (buffer + (i*8), "%08x", RANDOM_REG32);
+    sprintf (buffer + (i*8), "%08x", (unsigned int)random());
   }
   return String(buffer);
 }

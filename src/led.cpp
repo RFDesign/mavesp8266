@@ -1,14 +1,7 @@
 #include <Arduino.h>
 #include "led.h"
 #include "txmod_debug.h"
-
-// LED is on GPIO2, see also XModem.cpp, line 125
-//#define GPIO02  2
-#if (defined DEBUG_USE_SW_SERIAL) || (defined DEBUG_DISABLE)
-#define LEDGPIO 2
-#else
-#define LEDGPIO 16
-#endif
+#include "hwdefs.h"
 
 static bool LEDState = 0; // global for LED state.
 

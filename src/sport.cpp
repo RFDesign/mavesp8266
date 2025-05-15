@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include "hwdefs.h"
 #include "mavesp8266.h"
 #include "mavesp8266_parameters.h"
 #include "rfd900x.h"
@@ -149,9 +150,8 @@
 #include <common/mavlink.h>
 #include <ardupilotmega/ardupilotmega.h>
 #include "txmod_debug.h"
-#include <SoftwareSerial.h>
-
-SoftwareSerial frSerial;//(-1, Fr_txPin, true, 256);
+#include "hwdefs.h"
+HardwareSerial frSerial(FRUART); // SPort half-duplex inverted - Use me  TODO need to update pin defs
 
 uint32_t  sens_buf_full_count = 0;
 
@@ -637,11 +637,7 @@ void sport_setup()  {
     #error You must define at least one Battery_mAh_Source. Please correct.
   #endif            
 
-  #if (SPort_Serial == 1) 
-    debug_serial_println("Using Serial_1 for S.Port");     
-  #else
-    debug_serial_println("Using Serial_3 for S.Port");
-  #endif  
+    debug_serial_println("for S.Port Using Serial_"+String(FRUART));     
   
   #ifndef RSSI_Override
     debug_serial_println("RSSI Automatic Select");
@@ -1462,13 +1458,13 @@ void DecodeOneMavFrame(mavlink_message_t R2Gmsg) {
           //     (param.climb == 0.0))
           // {
           //   #if defined Mav_Debug_All || defined Mav_Debug_Hud
-          //     Serial1.print("Mavlink from FC #74 VFR_HUD: ");
-          //     Serial1.print("Airspeed= "); Serial1.print(ap_hud_air_spd_tmp, 2);                 // m/s    
-          //     Serial1.print("  Groundspeed= "); Serial1.print(ap_hud_grd_spd_tmp, 2);            // m/s
-          //     Serial1.print("  Heading= ");  Serial1.print(ap_hud_hdg_tmp);                      // deg
-          //     Serial1.print("  Throttle %= ");  Serial1.print(ap_hud_throt_tmp);                 // %
-          //     Serial1.print("  Baro alt= "); Serial1.print(ap_hud_bar_alt_tmp, 0);               // m                  
-          //     Serial1.print("  Climb rate= "); Serial1.println(ap_hud_climb_tmp);                // m/s
+          //     dbgSer.print("Mavlink from FC #74 VFR_HUD: ");
+          //     dbgSer.print("Airspeed= "); dbgSer.print(ap_hud_air_spd_tmp, 2);                 // m/s    
+          //     dbgSer.print("  Groundspeed= "); dbgSer.print(ap_hud_grd_spd_tmp, 2);            // m/s
+          //     dbgSer.print("  Heading= ");  dbgSer.print(ap_hud_hdg_tmp);                      // deg
+          //     dbgSer.print("  Throttle %= ");  v.print(ap_hud_throt_tmp);                 // %
+          //     dbgSer.print("  Baro alt= "); dbgSer.print(ap_hud_bar_alt_tmp, 0);               // m                  
+          //     dbgSer.print("  Climb rate= "); dbgSer.println(ap_hud_climb_tmp);                // m/s
           //   #endif 
           // } 
           // else 
@@ -1788,12 +1784,11 @@ void SPort_Init(void)  {
     sb[i].inuse = false;
   }
 
-  int8_t frRx = -1;
+  int8_t frRx = Fr_rxPin;
   int8_t frTx = Fr_txPin;
   bool   frInvert = true;
 
-  frSerial.begin(frBaud, SWSERIAL_8N1, frRx, frTx, frInvert);
-  frSerial.enableIntTx(true);  
+  frSerial.begin(frBaud, SERIAL_8N1, frRx, frTx, frInvert);
 } 
 
 //=================================================================================================  
@@ -2016,7 +2011,6 @@ void setSPortMode(SPortMode mode) {
       if(mode == rx && modeNow != rx) {   
         modeNow=mode; 
         pb_rx = true; 
-        frSerial.enableTx(false);  // disable interrupts on tx pin
       } 
   }
 //=================================================================================================  

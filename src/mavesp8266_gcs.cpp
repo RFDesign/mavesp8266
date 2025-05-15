@@ -35,6 +35,7 @@
  * @author Gus Grubba <mavlink@grubba.com>
  */
 
+#include "hwdefs.h"
 #include "mavesp8266.h"
 #include "mavesp8266_gcs.h"
 #include "mavesp8266_parameters.h"
@@ -180,7 +181,7 @@ MavESP8266GCS::_readMessage()
         if(_heard_from && (millis() - _last_heartbeat) > HEARTBEAT_TIMEOUT) {
             //-- Restart DHCP and start broadcasting again
             if(getWorld()->getParameters()->getWifiMode() == WIFI_MODE_AP) {
-                wifi_softap_dhcps_start();
+                WiFi.softAP(getWorld()->getParameters()->getWifiSsid(), getWorld()->getParameters()->getWifiPassword());//EFAULT_WIFI_CHANNEL, 0, 1);
             }
             _heard_from = false;
             _ip[3] = 255;

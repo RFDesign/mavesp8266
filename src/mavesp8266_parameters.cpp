@@ -37,9 +37,11 @@
 
 #include <Arduino.h>
 #include <EEPROM.h>
+#include "hwdefs.h"
 #include "mavesp8266.h"
 #include "mavesp8266_parameters.h"
 #include "crc.h"
+
 
 const char* kDEFAULT_SSID       = "TXMOD"; // this compiled-in default is updated on first boot to TXMOD-XX-XX-XX 
 const char* kDEFAULT_PASSWORD   = ""; //needs to be min 8 chars and easy for the first-time-user to discover
@@ -200,20 +202,20 @@ MavESP8266Parameters::loadAllFromEeprom()
         for(int j = 0; j < mavParameters[i].length; j++, address++, ptr++) {
             *ptr = EEPROM.read(address);
         }
-        #ifdef DEBUG
-            Serial1.print("Loading from EEPROM: ");
-            Serial1.print(mavParameters[i].id);
-            Serial1.print(" Value: ");
+        #if DEBUG
+            dbgSer.print("Loading from EEPROM: ");
+            dbgSer.print(mavParameters[i].id);
+            dbgSer.print(" Value: ");
             if(mavParameters[i].type == MAV_PARAM_TYPE_UINT32)
-                Serial1.println(*((uint32_t*)mavParameters[i].value));
+                dbgSer.println(*((uint32_t*)mavParameters[i].value));
             else if(mavParameters[i].type == MAV_PARAM_TYPE_UINT16)
-                Serial1.println(*((uint16_t*)mavParameters[i].value));
+                dbgSer.println(*((uint16_t*)mavParameters[i].value));
             else
-                Serial1.println(*((int8_t*)mavParameters[i].value));
+                dbgSer.println(*((int8_t*)mavParameters[i].value));
         #endif
     }
-    #ifdef DEBUG
-        Serial1.println("");
+    #if DEBUG
+        dbgSer.println("");
     #endif
     //-- Version if hardwired
     _sw_version = MAVESP8266_VERSION;
@@ -253,16 +255,16 @@ MavESP8266Parameters::saveAllToEeprom()
     uint32_t address = 0;
     for(int i = 0; i < ID_COUNT; i++) {
         ptr = (uint8_t*)mavParameters[i].value;
-        #ifdef DEBUG
-            Serial1.print("Saving to EEPROM: ");
-            Serial1.print(mavParameters[i].id);
-            Serial1.print(" Value: ");
+        #if DEBUG
+            dbgSer.print("Saving to EEPROM: ");
+            dbgSer.print(mavParameters[i].id);
+            dbgSer.print(" Value: ");
             if(mavParameters[i].type == MAV_PARAM_TYPE_UINT32)
-                Serial1.println(*((uint32_t*)mavParameters[i].value));
+                dbgSer.println(*((uint32_t*)mavParameters[i].value));
             else if(mavParameters[i].type == MAV_PARAM_TYPE_UINT16)
-                Serial1.println(*((uint16_t*)mavParameters[i].value));
+                dbgSer.println(*((uint16_t*)mavParameters[i].value));
             else
-                Serial1.println(*((int8_t*)mavParameters[i].value));
+                dbgSer.println(*((int8_t*)mavParameters[i].value));
         #endif
         for(int j = 0; j < mavParameters[i].length; j++, address++, ptr++) {
             EEPROM.write(address, *ptr);
@@ -271,10 +273,10 @@ MavESP8266Parameters::saveAllToEeprom()
     uint32_t saved_crc = _getEepromCrc();
     EEPROM.put(EEPROM_CRC_ADD, saved_crc);
     EEPROM.commit();
-    #ifdef DEBUG
-        Serial1.print("Saved CRC: ");
-        Serial1.print(saved_crc);
-        Serial1.println("");
+    #if DEBUG
+        dbgSer.print("Saved CRC: ");
+        dbgSer.print(saved_crc);
+        dbgSer.println("");
     #endif
 }
 
@@ -318,11 +320,11 @@ MavESP8266Parameters::_initEeprom()
     EEPROM.get(EEPROM_CRC_ADD, saved_crc);
     uint32_t current_crc = _getEepromCrc();
     if(saved_crc != current_crc) {
-        #ifdef DEBUG
-            Serial1.print("Initializing EEPROM. Saved: ");
-            Serial1.print(saved_crc);
-            Serial1.print(" Current: ");
-            Serial1.println(current_crc);
+        #if DEBUG
+            dbgSer.print("Initializing EEPROM. Saved: ");
+            dbgSer.print(saved_crc);
+            dbgSer.print(" Current: ");
+            dbgSer.println(current_crc);
         #endif
         //-- Set all defaults
         resetToDefaults();

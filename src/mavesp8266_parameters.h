@@ -38,8 +38,6 @@
 #ifndef MAVESP8266_PARAMETERS_H
 #define MAVESP8266_PARAMETERS_H
 
-#define WIFI_MODE_AP 0
-#define WIFI_MODE_STA 1
 
 //-- Constants
 #define DEFAULT_WIFI_MODE       WIFI_MODE_AP

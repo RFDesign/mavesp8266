@@ -1,6 +1,7 @@
 #include <FS.h>
 #include <XModem.h>
 #include "txmod_debug.h"
+#include "hwdefs.h"
 
 // Number of seconds until giving up hope of receiving sync packets from
 // host.
@@ -117,7 +118,6 @@ char XModem::waitACK(void)
       return(-1);
   } while ((inChar != NAK) && (inChar != ACK) && (inChar != 'C'));
   
-    #define LED 2
     digitalWrite(LED,!digitalRead(LED));  // toggle LED for user feedback
     debug_serial_print("." ); //feedback over serial too
     

@@ -38,7 +38,7 @@
 #ifndef MAVESP8266_H
 #define MAVESP8266_H
 
-#include <ESP8266WiFi.h>
+#include <WiFi.h>
 #include <WiFiClient.h>
 #include <WiFiUdp.h>
 
@@ -47,7 +47,10 @@
 
  extern "C" {
     // Espressif SDK
-    #include "user_interface.h"
+    #include "esp_system.h"
+    #include "esp_wifi.h"
+    #include "esp_event.h"
+    #include "esp_log.h"
 }
 
 class MavESP8266Parameters;
@@ -73,10 +76,7 @@ class MavESP8266GCS;
 #define BOOTLOADERNAME "/RFDSiK900x2.gbl"
 #define BOOTLOADERCOMPLETE "/RFDSiK900x2.gbl.ok"
 
-//Serial uses UART0, which is mapped to pins GPIO1 (TX) and GPIO3 (RX).  the pins for Serial0 can go on other pins if configured as such.
-// after a Serial.swap() Serial0 uses  GPIO13 and GPIO15 ( TXD2 and RXD2 )
-
-//Serial1 uses UART1, TX pin is GPIO2. UART1 can not be used to receive data because normally it's RX pin is occupied for flash chip connection ( GPIO8 )
+//Serial9xPri uses UART1, which is mapped to pins GPIO22 (TX) and GPIO23 (RX). 
 
 
 // more info here : https://github.com/esp8266/Arduino/blob/master/doc/reference.rst#serial
@@ -85,13 +85,12 @@ class MavESP8266GCS;
 
 
 //-- Debug sent out to Serial1 (GPIO02), which is TX only (no RX).
-//#define ENABLE_DEBUG true
 
 //  Debug sent out to softserial configured to use GPIO14 and GPIO16
 //#define ENABLE_SOFTDEBUG true
 
 
-#ifdef ENABLE_DEBUG
+#if ENABLE_DEBUG
 #define DEBUG_LOG(format, ...) do { getWorld()->getLogger()->log(format, ## __VA_ARGS__); } while(0)
 #else
 

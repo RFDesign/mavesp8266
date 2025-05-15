@@ -26,7 +26,7 @@
 
 #include <functional>
 #include <memory>
-#include <ESP8266WiFi.h>
+#include <WiFi.h>
 #include <FS.h>
 #include "detail/mimetable.h"
 
@@ -76,7 +76,7 @@ public:
   ESP8266WebServerTemplate(int port = 80);
   ~ESP8266WebServerTemplate();
 
-  using ClientType = typename ServerType::ClientType;
+  using ClientType = WiFiClient;
   using RequestHandlerType = RequestHandler<ServerType>;
   using WebServerType = ESP8266WebServerTemplate<ServerType>;
 

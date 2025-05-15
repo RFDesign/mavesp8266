@@ -1,10 +1,10 @@
 #pragma once
 
 #include "txmod_debug.h"
+#include "hwdefs.h"
 
 class MySerial { 
 public:
-  HardwareSerial * _Serial = NULL;
   bool _serial_connected = false;
 
   uint8_t rawserialbytes[255];
@@ -12,10 +12,9 @@ public:
   unsigned long last_ms; 
 
   MySerial(HardwareSerial *serial) {
-   _Serial = serial;
   }
   void begin() { 
-      //Serial->begin(4800, SERIAL_PARAM1, SERIAL1_RXPIN, SERIAL1_TXPIN);
+      //Serial9xPri->begin(4800, SERIAL_PARAM1, SERIAL1_RXPIN, SERIAL1_TXPIN);
       // delay(1000); // time to start up.
 
       // put_into_at_mode();
@@ -39,8 +38,8 @@ public:
    // debug_serial_print("-->");
     int saw_any_data = 0;
     while ((last_ms+wait_ms) > millis() )     {
-        if ( Serial.available() ) {
-            char c = Serial.read();
+        if ( Serial9xPri.available() ) {
+            char c = Serial9xPri.read();
             saw_any_data++;
            // debug_serial_print("Z:"); // debug only
            // debug_serial_println(String(c)); // debug only
@@ -80,8 +79,8 @@ public:
     int rawcount = 0;
     debug_serial_print(" -->");
     while ((last_ms+wait_ms) > millis() )     {
-        if ( Serial.available() ) {
-            char c = Serial.read();  rawcount++;
+        if ( Serial9xPri.available() ) {
+            char c = Serial9xPri.read();  rawcount++;
             debug_serial_print(c); // debug only
             if ( c == lookfor.charAt(offset) ) {  // next char we got is the next char we expected, so move forward a char and keep looking.
                 offset++;
@@ -125,8 +124,8 @@ public:
 
     debug_serial_print("-->");
     while ((last_ms+wait_ms) > millis() )     {
-        if ( Serial.available() ) {
-            char c = Serial.read();
+        if ( Serial9xPri.available() ) {
+            char c = Serial9xPri.read();
             debug_serial_print(c); // debug only
 
             if ( c == lookfor.charAt(offset) ) {  // next char we got is the next char we expected, so move forward a char and keep looking.

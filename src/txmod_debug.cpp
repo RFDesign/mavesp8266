@@ -1,34 +1,41 @@
-#include <SoftwareSerial.h>
+#include "hwdefs.h"
 #include "txmod_debug.h"
 
-#ifdef DEBUG_USE_SW_SERIAL
-#define DEBUG_SERIAL swSer
-SoftwareSerial swSer;
-#elif defined DEBUG_WEB
+#define DEBUG_SERIAL dbgSer
+
+#if ANYDEBUG
+#if DEBUG_USE_SW_SERIAL
+SoftwareSerial dbgSer;
+#elif DEBUG_WEB
 #include "webdebug.h"
-#else
-#define DEBUG_SERIAL Serial1
+#else 
+HardwareSerial dbgSer(dbgSerNo);
+#endif
 #endif
 
 void debug_init()
 {
-    #if not defined DEBUG_DISABLE
-    #ifdef DEBUG_USE_SW_SERIAL
-        swSer.begin(115200,SWSERIAL_8N1,14,16,false);
-        swSer.println(F("[MSG] initd swSer output"));
-    #elif defined DEBUG_WEB
+    static bool initialized = false;
+    if (initialized) return;
+    initialized = true;
+    #if ANYDEBUG
+    #if DEBUG_USE_SW_SERIAL
+        dbgSer.begin(DBGBAUD,SWSERIAL_8N1,rxDbgPin,txDbgPin,false);               // note SwSerial cannot work above 57600 baud
+        dbgSer.enableIntTx(true);                                               // Enable interrupts for SWSerial tx
+        dbgSer.println(F("[MSG] initd swSer output"));
+    #elif DEBUG_WEB
         webdebug_init();
     #else
-        Serial1.begin(115200);
-        Serial1.println(F("[MSG] initd Serial output"));
-        //Serial1.setDebugOutput(true);
+        dbgSer.begin(DBGBAUD,SERIAL_8N1,rxDbgPin,txDbgPin,false);
+        dbgSer.println(F("[MSG] initd Serial output"));
+        dbgSer.setDebugOutput(true);
     #endif
     #endif
 }
 
 void debug_println(String line)
 {
-#ifdef DEBUG_WEB
+#if DEBUG_WEB
     char buff[64];
     memset(buff, 0, sizeof(buff));
     line += "\n";
@@ -42,7 +49,7 @@ void debug_println(String line)
 
 void debug_print(String str)
 {
-#ifdef DEBUG_WEB
+#if DEBUG_WEB
     char buff[64];
     memset(buff, 0, sizeof(buff));
     str.toCharArray(buff, sizeof(buff));
@@ -55,8 +62,7 @@ void debug_print(String str)
 
 void debug_flush()
 {
-#ifdef DEBUG_WEB
-    
+#if DEBUG_WEB 
 #else
     DEBUG_SERIAL.flush();
 #endif    

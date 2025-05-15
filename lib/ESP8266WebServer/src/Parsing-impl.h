@@ -23,13 +23,14 @@
 #include "WiFiServer.h"
 #include "WiFiClient.h"
 #include "ESP8266WebServer.h"
+//#include "ESP8266WebServer-impl.h"
 #include "detail/mimetable.h"
 
 //#define DEBUG_ESP_HTTP_SERVER
 #ifdef DEBUG_ESP_PORT
 #define DEBUG_OUTPUT DEBUG_ESP_PORT
 #else
-#define DEBUG_OUTPUT Serial
+#define DEBUG_OUTPUT dbgSer
 #endif
 
 #ifndef WEBSERVER_MAX_POST_ARGS
@@ -40,7 +41,7 @@ static const char Content_Type[] PROGMEM = "Content-Type";
 static const char filename[] PROGMEM = "filename";
 
 template <typename ServerType>
-static bool readBytesWithTimeout(typename ServerType::ClientType& client, size_t maxLength, String& data, int timeout_ms)
+static bool readBytesWithTimeout(WiFiClient& client, size_t maxLength, String& data, int timeout_ms)
 {
   if (!data.reserve(maxLength + 1))
     return false;
@@ -61,7 +62,7 @@ static bool readBytesWithTimeout(typename ServerType::ClientType& client, size_t
 }
 
 template <typename ServerType>
-bool ESP8266WebServerTemplate<ServerType>::_parseRequest(ClientType& client) {
+bool ESP8266WebServerTemplate<ServerType>::_parseRequest(WiFiClient& client) {
   // Read the first line of HTTP request
   String req = client.readStringUntil('\r');
 #ifdef DEBUG_ESP_HTTP_SERVER

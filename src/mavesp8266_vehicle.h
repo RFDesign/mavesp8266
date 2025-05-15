@@ -38,6 +38,7 @@
 #ifndef MAVESP8266_VEHICLE_H
 #define MAVESP8266_VEHICLE_H
 
+#include "hwdefs.h"
 #include "mavesp8266.h"
 
 class MavESP8266Vehicle : public MavESP8266Bridge {

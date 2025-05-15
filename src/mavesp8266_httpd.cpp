@@ -36,6 +36,8 @@
  */
 
 #include <Arduino.h>
+#include <Update.h>
+#include "hwdefs.h"
 #include "mavesp8266.h"
 #include "mavesp8266_httpd.h"
 #include "mavesp8266_parameters.h"
@@ -43,9 +45,10 @@
 #include "mavesp8266_vehicle.h"
 
 #include <ESP8266WebServer.h>
-#include <FS.h> // spiffs support
+#include <FS.h> // SPIFFS support
+#include <LittleFS.h> // SPIFFS support
 
-#include <ESP8266mDNS.h>
+#include <mDNS.h>
 #include <ESP8266HTTPUpdateServer.h>
 
 #include "txmod_debug.h"
@@ -71,10 +74,10 @@ body{max-width:800px;width:90%;background-color:#f1f1f1;font-family:Verdana;marg
 p{font-size:12px;padding:0 0 15px 0;margin:0}p:last-child{padding-bottom:0}.b{margin:0 0 15px 0;background-color:#fff;padding:15px}
 a,a:hover,a:active,a:visited{background-color:transparent;font-size:10px;color:#3C9BED;padding:5px 7px;margin:0 3px 3px 0;border:1px solid #3C9BED;border-radius:5px;text-decoration:none;display:inline-block}a:hover{background-color:#D7EDFF}.warn{background-color:#ffe88e;padding:10px;border-radius:5px;font-style:italic}
 </style></head><body><div class='hd'><h1>TXMOD</h1></div><div class='cl h ct l'><div class='b'><h2>Network Status</h2>$net_info$<a href='/getstatus'>Network status</a><a href='/setup'>General settings</a></div>
-<div class='b'><h2>Device Info</h2><p class='warn'>It seems your TXMOD does not have a SPIFFS file system installed. Upload the SPIFFS file to fix this issue.</p>$device_info$</div>
+<div class='b'><h2>Device Info</h2><p class='warn'>It seems your TXMOD does not have a LittleFS file system installed. Upload the SPIFFS file to fix this issue.</p>$device_info$</div>
 <div class='b'><h2>RFD900x Setup Wizard</h2><p>The wizard allows you the adjust internal and remote long-range radios settings.</p><a href='/wiz.htm'>Go to First Run Wizard!</a></div>
 </div><div class='cl h ct'><div class='b'><h2>Documentation</h2><p>Requires internet access</p><a href='http://ardupilot.org'>ArduPilot Website</a><a href='http://ardupilot.org/copter/docs/common-esp8266-telemetry.html'>ESP8266 WiFi Documentation</a><a href='https://github.com/RFDesign/mavesp8266'>TXMOD ESP8266 Source Code</a><a href='http://files.rfdesign.com.au/firmware/'>TXMOD Firmware Updates</a></div>
-<div class='b'><h2>Advanced options</h2><a href='/plist'>RFD900x Radio Settings</a><a href='/updatepage'>Update Firmware</a><a href='/edit'>View and edit <!-- some --> files in the SPIFFS filesystem</a></div></div></body></html>)V0G0N";
+<div class='b'><h2>Advanced options</h2><a href='/plist'>RFD900x Radio Settings</a><a href='/updatepage'>Update Firmware</a><a href='/edit'>View and edit <!-- some --> files in the LittleFS filesystem</a></div></div></body></html>)V0G0N";
 
 
 const char* kBAUD       = "baud";
@@ -191,8 +194,9 @@ void handle_upload_status() {
         #ifdef DEBUG_SERIAL
             //DEBUG_SERIAL.setDebugOutput(true);
         #endif
-        WiFiUDP::stopAll();
-        Serial.end();
+        WiFiUDP udpInstance;
+        udpInstance.stop();
+        Serial9xPri.end();
         #ifdef DEBUG_SERIAL
             DEBUG_SERIAL.printf("Update: %s\n", upload.filename.c_str());
         #endif
@@ -310,11 +314,11 @@ bool handleFileRead(String path) {
   }
   String contentType = getContentType(path);
   String pathWithGz = path + ".gz";
-  if (SPIFFS.exists(pathWithGz) || SPIFFS.exists(path)) {
-    if (SPIFFS.exists(pathWithGz)) {
+  if (LittleFS.exists(pathWithGz) || LittleFS.exists(path)) {
+    if (LittleFS.exists(pathWithGz)) {
       path += ".gz";
     }
-    File file = SPIFFS.open(path, "r");
+    File file = LittleFS.open(path, "r");
     webServer.streamFile(file, contentType);
     file.close();
     return true;
@@ -329,11 +333,11 @@ bool handleFileRead(String path, uint minsize) {
   }
   String contentType = getContentType(path);
   String pathWithGz = path + ".gz";
-  if (SPIFFS.exists(pathWithGz) || SPIFFS.exists(path)) {
-    if (SPIFFS.exists(pathWithGz)) {
+  if (LittleFS.exists(pathWithGz) || LittleFS.exists(path)) {
+    if (LittleFS.exists(pathWithGz)) {
       path += ".gz";
     }
-    File file = SPIFFS.open(path, "r");
+    File file = LittleFS.open(path, "r");
     if (file.size() >= minsize) {
         webServer.streamFile(file, contentType);
         file.close();
@@ -357,18 +361,18 @@ static void handle_root()
     String int_rfd_sw_ver = "";
     String rem_rfd_sw_ver = "";
     String realSizeMB = "";
-    extern bool tcp_passthrumode;
+    extern bool isMainTCP;
     extern IPAddress localIP;
 
     // try to open a version file for the 900x inside the TXPOLE, continue without it anyway.
-    File v = SPIFFS.open(RFD_LOC_VER, "r");
+    File v = LittleFS.open(RFD_LOC_VER, "r");
     if ( v ) { 
         int_rfd_sw_ver = v.readString();
         v.close();
     }
 
     // try to open a version file for the 900x outside the TXPOLE, continue without it anyway.
-    v = SPIFFS.open(RFD_REM_VER, "r");
+    v = LittleFS.open(RFD_REM_VER, "r");
     if ( v ) { 
         rem_rfd_sw_ver = v.readString();
         v.close();
@@ -411,7 +415,7 @@ static void handle_root()
         device_info += "Flash size: <i>" + realSizeMB + "</i><br/>";
         device_info += "Up time: <i>" + up_time_str + "</i></p>";
 
-    String op_mode = tcp_passthrumode ? "TCP port 23" : "UDP port " + String(getWorld()->getParameters()->getWifiUdpHport());
+    String op_mode = isMainTCP ? "TCP port 23" : "UDP port " + String(getWorld()->getParameters()->getWifiUdpHport());
     String wifi_mode = getWorld()->getParameters()->getWifiMode() == WIFI_MODE_AP ? "Access Point" : "Station";
     String sport_en = getWorld()->getParameters()->getSPORTenable() ? "Enabled" : "Disabled";
 
@@ -430,7 +434,7 @@ static void handle_root()
     // CAUTION: this cache to spiffs is becasue of a breakdown if the resulting index.htm we send is more than abut 6k in size
     // but could be made to work on bigger files if we write the above to spiffs as (say) index.cache.htm, then 
     //sent the result with handleFileRead("/index.cache.htm"). 
-    File f = SPIFFS.open("/index.htm", "r");
+    File f = LittleFS.open("/index.htm", "r");
     if (f.size() > 100) { 
         message = f.readString();
         f.close();
@@ -573,9 +577,9 @@ static void handle_getStatus()
     linkStatus* vehicleStatus = getWorld()->getVehicle()->getStatus();
     String message = FPSTR(kHEADER);
 
-    extern bool tcp_passthrumode;
+    extern bool isMainTCP;
 
-    if ( tcp_passthrumode == false ) { 
+    if ( isMainTCP == false ) { 
         message += "<h2>Communication status</h2><div class='pr'><p class='gr' style='visibility:visible;width:100%'>Device is currently In UDP (mavlink) mode. ";
         message += "To connect your GCS in UDP (mavlink) mode, please open a UDP port on port number: ";
         message += getWorld()->getParameters()->getWifiUdpHport();
@@ -632,7 +636,7 @@ static void handle_getStatus()
         message += "</td></tr></table>";
         message += "<h2 style='margin-top:15px'>System Status</h2><table>";
         message += "<tr><td width=\"240\">Flash Size</td><td>";
-        message += ESP.getFlashChipRealSize();
+        message += ESP.getFlashChipSize();
         message += "</td></tr>";
         message += "<tr><td width=\"240\">Flash Available</td><td>";
         message += flash;
@@ -674,7 +678,7 @@ void handle_getJSysInfo()
     if(!paramCRC[0]) {
         snprintf(paramCRC, sizeof(paramCRC), "%08X", getWorld()->getParameters()->paramHashCheck());
     }
-    uint32_t fid = spi_flash_get_id();
+    uint32_t fid = 0;//ESP.getFlashChipId();
     char message[512];
     snprintf(message, 512,
         "{ "
@@ -685,7 +689,7 @@ void handle_getJSysInfo()
         "\"logsize\": \"%u\", "
         "\"paramcrc\": \"%s\""
         " }",
-        kFlashMaps[system_get_flash_size_map()],
+        kFlashMaps[ESP.getFlashChipSize() / (512 * 1024)],
         (long unsigned int)(fid & 0xff), (long unsigned int)((fid & 0xff00) | ((fid >> 16) & 0xff)),
         flash,
         ESP.getFreeHeap(),
@@ -872,8 +876,8 @@ void handle_wiz_save() // accept updated param/s via POST, save them, then displ
         }
 
         //remove cached radio parameter files prior to factory-reset
-        SPIFFS.remove(RFD_REM_PAR);
-        SPIFFS.remove(RFD_LOC_PAR);
+        LittleFS.remove(RFD_REM_PAR);
+        LittleFS.remove(RFD_LOC_PAR);
 
         // factory default the radio/s to (a) put them in a good state, and (b) clear any encryption key for later...
         // disable encryption via factory default and reboot
@@ -943,7 +947,7 @@ void handle_wiz_save() // accept updated param/s via POST, save them, then displ
                  
                 if (w2.length() > 30 ) { // basic check, file should exist and have at least 30 bytes in it to be plausible
 
-                     File encfile = SPIFFS.open(RFD_ENC_KEY, "w");
+                     File encfile = LittleFS.open(RFD_ENC_KEY, "w");
                      encfile.println(w2);
                      encfile.close();
                      debug_serial_println("Wrote Enc Key to /key.txt");
@@ -1499,11 +1503,11 @@ void handleFileUpload() {
     // if its a firmware .bin file we are about to upload, remove the .in.ok first
     // .. as in a small 2M SPIFFS we really don't have room for more than 1 of these
     if (filename == BOOTLOADERNAME ) { 
-        SPIFFS.remove(BOOTLOADERNAME); // cleanup incase an old one is still there. 
-        SPIFFS.remove(BOOTLOADERCOMPLETE); // cleanup incase an old one is still there. 
+        LittleFS.remove(BOOTLOADERNAME); // cleanup incase an old one is still there. 
+        LittleFS.remove(BOOTLOADERCOMPLETE); // cleanup incase an old one is still there. 
     }
 
-    fsUploadFile = SPIFFS.open(filename, "w");
+    fsUploadFile = LittleFS.open(filename, "w");
     filename = String();
   } else if (upload.status == UPLOAD_FILE_WRITE) {
     debug_serial_print("handleFileUpload Data: "); debug_serial_println(upload.currentSize);
@@ -1527,7 +1531,7 @@ void handleFileUpload() {
 // /plist
 void handle900xParamList() { 
     debug_serial_println("handle900xParamList()");
-    File html = SPIFFS.open("/r900x_params.htm", "r");
+    File html = LittleFS.open("/r900x_params.htm", "r");
  
     html.setTimeout(50); // don't wait long as it's a file object, not a serial port.
  
@@ -1590,22 +1594,24 @@ void handleFileList() {
 
   String path = webServer.arg("dir");
   debug_serial_println("handleFileList: " + path);
-  Dir dir = SPIFFS.openDir(path);
-  path = String();
+  File root = LittleFS.open(path, "r");
+  if (!root || !root.isDirectory()) {
+    webServer.send(500, kTEXTPLAIN, "Failed to open directory");
+    return;
+  }
 
   String output = "[";
-  while (dir.next()) {
-    File entry = dir.openFile("r");
+  File entry = root.openNextFile();
+  while (entry) {
     if (output != "[") {
       output += ',';
     }
-    bool isDir = false;
     output += "{\"type\":\"";
-    output += (isDir) ? "dir" : "file";
+    output += (entry.isDirectory()) ? "dir" : "file";
     output += "\",\"name\":\"";
     output += String(entry.name()).substring(1);
     output += "\"}";
-    entry.close();
+    entry = root.openNextFile();
   }
 
   output += "]";
@@ -1622,10 +1628,10 @@ void handleFileDelete() {
   if (path == F("/")) {
     return webServer.send(500, kTEXTPLAIN, "BAD PATH");
   }
-  if (!SPIFFS.exists(path)) {
+  if (!LittleFS.exists(path)) {
     return webServer.send(404, kTEXTPLAIN, "FileNotFound");
   }
-  SPIFFS.remove(path);
+  LittleFS.remove(path);
   webServer.send(200, kTEXTPLAIN, "");
   path = String();
 }
@@ -1640,10 +1646,10 @@ void handleFileCreate() {
   if (path == F("/")) {
     return webServer.send(500, kTEXTPLAIN, "BAD PATH");
   }
-  if (SPIFFS.exists(path)) {
+  if (LittleFS.exists(path)) {
     return webServer.send(500, kTEXTPLAIN, "FILE EXISTS");
   }
-  File file = SPIFFS.open(path, "w");
+  File file = LittleFS.open(path, "w");
   if (file) {
     file.close();
   } else {
@@ -1673,14 +1679,14 @@ void handle900xParamSave() {
   String filename = RFD_LOC_PAR; // default name
   if (webServer.hasArg("f")) { 
        filename = webServer.arg("f");
-       f = SPIFFS.open(filename, "w");
+       f = LittleFS.open(filename, "w");
   } else { 
-      f = SPIFFS.open(filename, "w");
+    f = LittleFS.open(filename, "w");
   }
 
   if(webServer.hasArg(kPLAIN)) { // ie PUT/POST content was given....
         // write params to spiffs,  TODO need better checks here, as it comes from the client, but the worse they can do is pretty minor
-       //File f = SPIFFS.open(RFD_LOC_PAR, "w");
+       //File f = LittleFS.open(RFD_LOC_PAR, "w");
        f.print(webServer.arg(kPLAIN));
        f.close();
        message += "\nFile written:";
@@ -1808,14 +1814,15 @@ MavESP8266Httpd::begin(MavESP8266Update* updateCB_)
     mac_s = mac2String(mac); // set this as a global, as we use it 'extern' in  http server to show to the user.
 
     // make sure programmed with correct spiffs settings.
-    realSize = String(ESP.getFlashChipRealSize());
-    String ideSize = String(ESP.getFlashChipSize());
-    bool flashCorrectlyConfigured = realSize.equals(ideSize);
-    if(!flashCorrectlyConfigured)  debug_serial_println("ERROR!!! flash incorrectly configured,  cannot start.");
-    debug_serial_println("Flash IDE size: " + ideSize + ", real size: " + realSize);
+    //realSize = String(ESP.getFlashChipRealSize());
+    //String ideSize = String(ESP.getFlashChipSize());
+    //bool flashCorrectlyConfigured = realSize.equals(ideSize);
+    //if(!flashCorrectlyConfigured)  debug_serial_println("ERROR!!! flash incorrectly configured,  cannot start.");
+    //debug_serial_println("Flash IDE size: " + ideSize + ", real size: " + realSize);
+    //TODO how can we do this on esp32?
 
     //MDNS.addService("http", "tcp", 80);
-    //swSer.printf("HTTPUpdateServer ready! Open http://%s.local/update in your browser\n", webupdatehost);
+    //dbgSer.printf("HTTPUpdateServer ready! Open http://%s.local/update in your browser\n", webupdatehost);
 }
 
 //---------------------------------------------------------------------------------

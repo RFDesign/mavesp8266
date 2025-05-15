@@ -3,10 +3,6 @@
 
 #include <Arduino.h>
 
-//#define DEBUG_USE_SW_SERIAL 1
-#define DEBUG_DISABLE 
-//#define DEBUG_WEB
-
 void debug_init();
 void debug_println(String line);
 void debug_print(String str);
@@ -19,7 +15,7 @@ void debug_flush();
     debug_serial_print(String(X)); \
     debug_flush()
 
-#ifdef DEBUG_DISABLE
+#if !DEBUG_ENABLE
 #define debug_serial_println(X)
 #define debug_serial_print(X)
 #else
