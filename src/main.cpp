@@ -265,6 +265,8 @@ void setup() {
     // Parameters.setWifiMode(WIFI_MODE_STA);
     // Parameters.setWifiStaPassword("RFD41187@");
     // Parameters.setWifiStaSsid("RFD");
+    // getWorld()->getParameters()->setUartBaudRate(38400);
+
 
     if(Parameters.getWifiMode() == WIFI_MODE_STA){
         DEBUG_LOG("\nEntering station mode...\n");
@@ -412,7 +414,7 @@ static inline void MainTCPSerPassThru() {
             //stats_serial_in += bytes_read;
             //stats_tcp_pkts++;
             //if (bytes_read > largest_serial_packet) largest_serial_packet = avail;
-            //Vehicle.parseMessage(bufMainLen, bufMain);                          // process messages for sport and other stuff
+            Vehicle.parseMessage(bufMainLen, bufMain);                          // process messages for sport and other stuff
         }
     }
     #endif
@@ -578,37 +580,37 @@ void loop() {
         //     }
         // }
     }
-    //delay(0);
-    //  if(isMavlinkEnabled && !updateStatus.isUpdating()) {  //TODO put back in later once we can fix the issues with parsing messages
-    //      force_vehicle_datastream();
-    //      force_heartbeats();
-    //  }
+    delay(0);
+     if(isMavlinkEnabled && !updateStatus.isUpdating()) {  //TODO put back in later once we can fix the issues with parsing messages
+         force_vehicle_datastream();
+         force_heartbeats();
+     }
 
-    //updateServer.checkUpdates(); // aka webserver.handleClient()
+    updateServer.checkUpdates(); // aka webserver.handleClient()
     // MDNS.update();TODO is there an equivalent?
 
 
-    //delay(0);
+    delay(0);
 
-    // if (factory_reset_req) {
+    if (factory_reset_req) {
 
-    //     debug_serial_println(F("attempting factory reset"));
+        debug_serial_println(F("attempting factory reset"));
 
-    //     r900x_attempt_factory_reset();
+        r900x_attempt_factory_reset();
 
-    //     LittleFS.remove(RFD_ENC_KEY);
-    //     LittleFS.remove(RFD_REM_PAR);
-    //     LittleFS.remove(RFD_LOC_PAR);
-    //     LittleFS.remove(RFD_REM_VER);
-    //     LittleFS.remove(RFD_LOC_VER);
+        LittleFS.remove(RFD_ENC_KEY);
+        LittleFS.remove(RFD_REM_PAR);
+        LittleFS.remove(RFD_LOC_PAR);
+        LittleFS.remove(RFD_REM_VER);
+        LittleFS.remove(RFD_LOC_VER);
         
-    //     set_led_state(true);
-    //     Parameters.resetToDefaults();
-    //     Parameters.saveAllToEeprom();
+        set_led_state(true);
+        Parameters.resetToDefaults();
+        Parameters.saveAllToEeprom();
         
-    //     debug_serial_println(F("FACTORY RESET BUTTON PRESSED - wifi params defaulted!\n"));
+        debug_serial_println(F("FACTORY RESET BUTTON PRESSED - wifi params defaulted!\n"));
 
-    //     ESP.restart();
-    // }
-    //if (getWorld()->getParameters()->getSPORTenable()) sport_loop();
+        ESP.restart();
+    }
+    if (getWorld()->getParameters()->getSPORTenable()) sport_loop();
 }

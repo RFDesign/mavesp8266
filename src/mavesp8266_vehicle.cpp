@@ -57,7 +57,6 @@ MavESP8266Vehicle::begin(MavESP8266Bridge* forwardTo)
 {
     MavESP8266Bridge::begin(forwardTo);
     //-- Start UART connected to UAS
-    //getWorld()->getParameters()->setUartBaudRate(1000000);
     debug_serial_print("MavESP8266Veh Serial9xPri" + String(getWorld()->getParameters()->getUartBaudRate()) + "\n");
     Serial9xPri.begin(getWorld()->getParameters()->getUartBaudRate());
     // raise serial buffer size (default is 256)
