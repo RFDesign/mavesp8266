@@ -53,6 +53,8 @@
 
 #include "updater.h"  // const char PROGMEM UPDATER[] , allows us to embed a copy of update.htm for the /updatepage
 
+#include "sport/autopilotselection.h"
+
 const char PROGMEM kTEXTPLAIN[]  = "text/plain";
 const char PROGMEM kTEXTHTML[]   = "text/html";
 const char PROGMEM kACCESSCTL[]  = "Access-Control-Allow-Origin";
@@ -96,6 +98,9 @@ const char* kMODE       = "mode";
 const char* kSPORT      = "sport";
 const char* kBATTC      = "battc";
 const char* kBAT2C      = "bat2c";
+const char* kSPORT_RX_ADDRESS_MODE      = "sport_rx_address_mode";
+const char* kSPORT_RX_SYSID      = "sport_rx_sysid";
+const char* kSPORT_RX_COMPID      = "sport_rx_compid";
 
 const char* kFlashMaps[7] = {
     "512KB (256/256)",
@@ -449,6 +454,97 @@ static void handle_root()
     webServer.send(200, FPSTR(kTEXTHTML), message);    
 }
 
+static String HTMLTag(String Inner, String Tag, String Params)
+{
+    return "<" + Tag + Params + ">" + Inner + "</" + Tag + ">";
+}
+
+static String HTMLTag(String Inner, String Tag)
+{
+    return HTMLTag(Inner, Tag, "");
+}
+
+static String HTMLParam(String Name, String Value)
+{
+    return " " + Name + "=\"" + Value + "\"";
+}
+
+static void append_param(String &message, String DisplayText, String Name, String Value, String Note)
+{
+    String Result = "<input type='text' name='" + Name + "' value='";
+    Result += Value;
+    Result += "'>" + Note;
+    Result = HTMLTag(Result, "td");
+    Result = HTMLTag(DisplayText, "td") + Result;
+    message += HTMLTag(Result, "tr");
+}
+
+static void append_param(String &message, String DisplayText, String Name, int Value, String Note)
+{
+    String V;
+    V += Value;
+    append_param(message, DisplayText, Name, V, Note);
+}
+
+/// @brief Create a radio button
+/// @param GroupName 
+/// @param Name 
+/// @param Value 
+/// @param DisplayText 
+/// @param Checked 
+/// @return 
+static String RadioButton(String GroupName, String Name, String Value, String DisplayText, bool Checked)
+{
+    String Params = HTMLParam("type", "radio") + HTMLParam("id", Name) + HTMLParam("name", GroupName) + HTMLParam("value", Value);
+
+    if (Checked)
+    {
+        Params += HTMLParam("checked", "true");
+    }
+
+    String Result = HTMLTag("", "input", Params);
+    Result += HTMLTag(DisplayText, "label", HTMLParam("for", Name));
+    return Result;
+}
+
+/// @brief Create a text input
+/// @param Name 
+/// @param DisplayText 
+/// @param Value 
+/// @return 
+static String TextInput(String Name, String DisplayText, String Value)
+{
+    return DisplayText + HTMLTag("", "input", 
+        HTMLParam("type", "text") + HTMLParam("name", Name) + HTMLParam("value", Value));
+}
+
+/// @brief Create a text input
+/// @param Name
+/// @param DisplayText 
+/// @param Value 
+/// @return 
+static String TextInput(String Name, String DisplayText, uint8_t Value)
+{
+    String V;
+    V += Value;
+
+    return TextInput(Name, DisplayText, V);
+}
+
+/// @brief Append the table row which allows selection of a sysid and compid for s.port.
+/// @param message 
+static void append_sport_sysid_row(String &message)
+{
+    bool ManualSelected = getWorld()->getParameters()->getSPORTRxAddressMode() == MavESP8266Parameters::TSPortRxAddressMode::MANUAL;
+
+    String Auto = HTMLTag(RadioButton(kSPORT_RX_ADDRESS_MODE, "sport_sysid_setting_auto", "auto", "Auto", !ManualSelected), "td", HTMLParam("style", "vertical-align:top"));
+    String Manual = RadioButton(kSPORT_RX_ADDRESS_MODE, "sport_sysid_setting_manual", "manual", "Manual", ManualSelected) + "<br>";
+    Manual += TextInput(kSPORT_RX_SYSID, "Sys ID", getWorld()->getParameters()->getSPORTRxSysID()) + "<br>";
+    Manual += TextInput(kSPORT_RX_COMPID, "Comp ID", getWorld()->getParameters()->getSPORTRxCompID());
+    Manual = HTMLTag(Manual, "td", HTMLParam("style", "vertical-align:top"));
+    String Row = HTMLTag("S.PORT MAV Address", "td") + HTMLTag(HTMLTag(HTMLTag(Auto + Manual, "tr"), "table"), "td");
+    message += HTMLTag(Row, "tr");
+}
 
 static void handle_setup_adv(String more)
 {
@@ -469,84 +565,52 @@ static void handle_setup_adv(String more)
     }
     message += ">Station</td></tr>";
     
-    message += "<tr><td>AP SSID</td><td>";
-    message += "<input type='text' name='ssid' value='";
-    message += getWorld()->getParameters()->getWifiSsid();
-    message += "'></td></tr>";
+    append_param(message, "AP SSID", "ssid", getWorld()->getParameters()->getWifiSsid(), "");
+
+    String PasswordNote = "<span style='font-weight:bold;color:#22bdff' title='The password must be at least 8 characters long'>&nbsp;&#9432;</span>";
 
     message += "<tr><td>AP Password</td><td>";
     message += "<input type='text' name='pwd' id='pwd' value='";
     message += getWorld()->getParameters()->getWifiPassword();
-    message += "'><span style='font-weight:bold;color:#22bdff' title='The password must be at least 8 characters long'>&nbsp;&#9432;</span></td></tr>";
+    message += "'>" + PasswordNote + "</td></tr>";
 
-    message += "<tr><td>WiFi Channel</td><td>";
-    message += "<input type='text' name='channel' value='";
-    message += getWorld()->getParameters()->getWifiChannel();
-    message += "'></td></tr>";
+    append_param(message, "WiFi Channel", "channel", getWorld()->getParameters()->getWifiChannel(), "");
 
-    message += "<tr><td>Station SSID</td><td>";
-    message += "<input type='text' name='ssidsta' value='";
-    message += getWorld()->getParameters()->getWifiStaSsid();
-    message += "'></td></tr>";
+    append_param(message, "Station SSID", "ssidsta", getWorld()->getParameters()->getWifiStaSsid(), "");
 
-    message += "<tr><td>Station Password:</td><td>";
-    message += "<input type='text' name='pwdsta' value='";
-    message += getWorld()->getParameters()->getWifiStaPassword();
-    message += "'><span style='font-weight:bold;color:#22bdff' title='The password must be at least 8 characters long'>&nbsp;&#9432;</span></td></tr>";
+    append_param(message, "Station Password:", "pwdsta", getWorld()->getParameters()->getWifiStaPassword(), PasswordNote);
 
-    IPAddress IP;    
-    message += "<tr><td>Station IP</td><td>";
-    message += "<input type='text' name='ipsta' value='";
+    IPAddress IP;
     IP = getWorld()->getParameters()->getWifiStaIP();
-    message += IP.toString();
-    message += "'></td></tr>";
+    append_param(message, "Station IP", "ipsta", IP.toString(), "");
 
-    message += "<tr><td>Station Gateway</td><td>";
-    message += "<input type='text' name='gatewaysta' value='";
     IP = getWorld()->getParameters()->getWifiStaGateway();
-    message += IP.toString();
-    message += "'></td></tr>";
+    append_param(message, "Station Gateway", "gatewaysta", IP.toString(), "");
 
-    message += "<tr><td>Station Subnet</td><td>";
-    message += "<input type='text' name='subnetsta' value='";
-    IP = getWorld()->getParameters()->getWifiStaSubnet();
-    message += IP.toString();
-    message += "'></td></tr>";
+    append_param(message, "Station Subnet", "subnetsta", getWorld()->getParameters()->getWifiStaSubnet(), "");
 
-    message += "<tr><td>Host Port</td><td>";
-    message += "<input type='text' name='hport' value='";
-    message += getWorld()->getParameters()->getWifiUdpHport();
-    message += "'></td></tr>";
+    append_param(message, "Host Port", "hport", getWorld()->getParameters()->getWifiUdpHport(), "");
 
-    message += "<tr><td>Client Port</td><td>";
-    message += "<input type='text' name='cport' value='";
-    message += getWorld()->getParameters()->getWifiUdpCport();
-    message += "'></td></tr>";
+    append_param(message, "Client Port", "cport", getWorld()->getParameters()->getWifiUdpCport(), "");
     
-    message += "<tr><td>Baudrate</td><td>";
-    message += "<input type='text' name='baud' value='";
-    message += getWorld()->getParameters()->getUartBaudRate();
-    message += "'></td></tr>";
+    append_param(message, "Baudrate", "baud", getWorld()->getParameters()->getUartBaudRate(), "");
 
     message += "<tr><td colspan='2'><h2 style='margin:15px 0 5px 0'>S.PORT</h2>";
     message += "<p style='margin-bottom:15px'>The S.PORT telemetry link is only available on TXMOD V2 and hardware modified TXMOD V1.</p></td>";
 
+    String SportNote = "<span style='font-weight:bold;color:#22bdff' title='This feature might not be available in your hardware.'>&nbsp;&#9432;</span>";
     message += "<tr><td>S.PORT output enable</td><td>";
     message += "<input type='checkbox' name='sport' value='1'";
     if (getWorld()->getParameters()->getSPORTenable()) {
         message += " checked";
     }
-    message += "><span style='font-weight:bold;color:#22bdff' title='This feature might not be available in your hardware.'>&nbsp;&#9432;</span></td></tr>";
+    message += ">" + SportNote + "</td></tr>";
+    
+    append_sport_sysid_row(message);
 
-    message += "<tr><td>Battery 1 capacity (mAh)</td><td>";
-    message += "<input type='text' name='battc' value='";
-    message += getWorld()->getParameters()->getBattCapacitymAh();
-    message += "'></td></tr>";
-
-    message += "<tr><td>Battery 2 capacity (mAh)</td><td>";
-    message += "<input type='text' name='bat2c' value='";
-    message += getWorld()->getParameters()->getBat2CapacitymAh();
-    message += "'></td></tr>";
+    append_param(message, "Battery 1 capacity (mAh)", "battc", getWorld()->getParameters()->getBattCapacitymAh(), "");
+    
+    append_param(message, "Battery 2 capacity (mAh)", "bat2c", getWorld()->getParameters()->getBat2CapacitymAh(), "");
     
     message += "<tr><td colspan='2'><input style='width:100px' type='submit' value='Save' onclick=""></td></tr>";
     message += "</form></table>";
@@ -598,6 +662,28 @@ static void handle_getStatus()
         message += vehicleStatus->parse_errors;
         message += "</td></tr><tr><td>Radio Messages</td><td>";
         message += gcsStatus->radio_status_sent;
+        message += "</td></tr><tr><td>Messages for S.PORT</td><td>";
+        message += sport::autopilotselection::GetCount();
+        sport::autopilotselection::TMAVAddress MAVAddr;
+        bool GotSPortAddress = sport::autopilotselection::GetChosenMAVAddr(MAVAddr);
+        message += "</td></tr><tr><td>S.PORT SysID</td><td>";
+        if (GotSPortAddress)
+        {
+            message += MAVAddr.SysID;
+        }
+        else
+        {
+            message += "--";   
+        }
+        message += "</td></tr><tr><td>S.PORT CompID</td><td>";
+        if (GotSPortAddress)
+        {
+            message += MAVAddr.CompID;
+        }
+        else
+        {
+            message += "--";   
+        }
         message += "</td></tr></table>";
         message += "<h2 style='margin-top:15px'>System Status</h2><table>";
         message += "<tr><td width=\"240\">Flash Available</td><td>";
@@ -1413,6 +1499,19 @@ void handle_setParameters() // accept updated param/s via POST, save them, then 
         getWorld()->getParameters()->setSPORTenable(webServer.arg(kSPORT).toInt());
     } else {
         getWorld()->getParameters()->setSPORTenable(false);
+    }
+    if(webServer.hasArg(kSPORT_RX_ADDRESS_MODE)){
+        ok = true;
+        uint8_t Value = webServer.arg(kSPORT_RX_ADDRESS_MODE) == "manual" ? 1 : 0;
+        getWorld()->getParameters()->setSPORTRxAddressMode(Value);
+    }
+    if(webServer.hasArg(kSPORT_RX_SYSID)){
+        ok = true;
+        getWorld()->getParameters()->setSPORTRxSysID(webServer.arg(kSPORT_RX_SYSID).toInt());
+    }
+    if(webServer.hasArg(kSPORT_RX_COMPID)){
+        ok = true;
+        getWorld()->getParameters()->setSPORTRxCompID(webServer.arg(kSPORT_RX_COMPID).toInt());
     }
     if(webServer.hasArg(kBATTC)) {
         ok = true;

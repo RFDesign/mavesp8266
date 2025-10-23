@@ -149,6 +149,7 @@
 #include <common/mavlink.h>
 #include <ardupilotmega/ardupilotmega.h>
 #include "txmod_debug.h"
+#include "sport/autopilotselection.h"
 #include <SoftwareSerial.h>
 
 SoftwareSerial frSerial;//(-1, Fr_txPin, true, 256);
@@ -743,9 +744,22 @@ void sport_loop() {
 //                               E N D   O F   M  A  I  N    L  O  O  P
 //================================================================================================= 
 
+/**
+ * Handle a mavlink message from the UAS
+ */
 void sport_handle_mavlink(mavlink_message_t * msg) {
     //debug_serial_println("mav msg rcvd: "+String(msg->msgid));
-    MavToRingBuffer(msg);
+    sport::autopilotselection::Ingest(msg);
+    if (sport::autopilotselection::IsThisFromTheChosenAutoPilot(msg) || 
+      msg->msgid == MAVLINK_MSG_ID_RADIO_STATUS)
+    {
+      MavToRingBuffer(msg);
+      sport::autopilotselection::IncrementCount();
+    }
+    else
+    {
+      //debug_println("Message not from AP " + String(msg->sysid) + " " + String(msg->compid));
+    }
 }
 //=================================================================================================  
 void PrintByte(byte b) {

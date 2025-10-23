@@ -68,41 +68,47 @@ uint32_t    _bat2_capacity_mah;
 uint32_t    _flash_left;
 bool        _sport_enable;
 int8_t      _raw_enable;
+uint8_t     _sport_rx_addr_mode;
+uint8_t     _sport_rx_sysid;
+uint8_t     _sport_rx_compid;
 
 //-- Parameters
 //   No string support in parameters so we stash a char[16] into 4 uint32_t
  struct stMavEspParameters mavParameters[] = {
-     {"SW_VER",             &_sw_version,           MavESP8266Parameters::ID_FWVER,     sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  true },
-     {"DEBUG_ENABLED",      &_debug_enabled,        MavESP8266Parameters::ID_DEBUG,     sizeof(int8_t),     MAV_PARAM_TYPE_INT8,    false},
-     {"WIFI_MODE",          &_wifi_mode,            MavESP8266Parameters::ID_MODE,      sizeof(int8_t),     MAV_PARAM_TYPE_INT8,    false},
-     {"WIFI_CHANNEL",       &_wifi_channel,         MavESP8266Parameters::ID_CHANNEL,   sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  false},
-     {"WIFI_UDP_HPORT",     &_wifi_udp_hport,       MavESP8266Parameters::ID_HPORT,     sizeof(uint16_t),   MAV_PARAM_TYPE_UINT16,  false},
-     {"WIFI_UDP_CPORT",     &_wifi_udp_cport,       MavESP8266Parameters::ID_CPORT,     sizeof(uint16_t),   MAV_PARAM_TYPE_UINT16,  false},
-     {"WIFI_IPADDRESS",     &_wifi_ip_address,      MavESP8266Parameters::ID_IPADDRESS, sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  true },
-     {"WIFI_SSID1",         &_wifi_ssid[0],         MavESP8266Parameters::ID_SSID1,     sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  false},
-     {"WIFI_SSID2",         &_wifi_ssid[4],         MavESP8266Parameters::ID_SSID2,     sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  false},
-     {"WIFI_SSID3",         &_wifi_ssid[8],         MavESP8266Parameters::ID_SSID3,     sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  false},
-     {"WIFI_SSID4",         &_wifi_ssid[12],        MavESP8266Parameters::ID_SSID4,     sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  false},
-     {"WIFI_PASSWORD1",     &_wifi_password[0],     MavESP8266Parameters::ID_PASS1,     sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  false},
-     {"WIFI_PASSWORD2",     &_wifi_password[4],     MavESP8266Parameters::ID_PASS2,     sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  false},
-     {"WIFI_PASSWORD3",     &_wifi_password[8],     MavESP8266Parameters::ID_PASS3,     sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  false},
-     {"WIFI_PASSWORD4",     &_wifi_password[12],    MavESP8266Parameters::ID_PASS4,     sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  false},
-     {"WIFI_SSIDSTA1",      &_wifi_ssidsta[0],      MavESP8266Parameters::ID_SSIDSTA1,  sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  false},
-     {"WIFI_SSIDSTA2",      &_wifi_ssidsta[4],      MavESP8266Parameters::ID_SSIDSTA2,  sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  false},
-     {"WIFI_SSIDSTA3",      &_wifi_ssidsta[8],      MavESP8266Parameters::ID_SSIDSTA3,  sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  false},
-     {"WIFI_SSIDSTA4",      &_wifi_ssidsta[12],     MavESP8266Parameters::ID_SSIDSTA4,  sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  false},
-     {"WIFI_PWDSTA1",       &_wifi_passwordsta[0],  MavESP8266Parameters::ID_PASSSTA1,  sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  false},
-     {"WIFI_PWDSTA2",       &_wifi_passwordsta[4],  MavESP8266Parameters::ID_PASSSTA2,  sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  false},
-     {"WIFI_PWDSTA3",       &_wifi_passwordsta[8],  MavESP8266Parameters::ID_PASSSTA3,  sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  false},
-     {"WIFI_PWDSTA4",       &_wifi_passwordsta[12], MavESP8266Parameters::ID_PASSSTA4,  sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  false},
-     {"WIFI_IPSTA",         &_wifi_ipsta,           MavESP8266Parameters::ID_IPSTA,     sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  false},
-     {"WIFI_GATEWAYSTA",    &_wifi_gatewaysta,      MavESP8266Parameters::ID_GATEWAYSTA,sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  false},
-     {"WIFI_SUBNET_STA",    &_wifi_subnetsta,       MavESP8266Parameters::ID_SUBNETSTA, sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  false},
-     {"UART_BAUDRATE",      &_uart_baud_rate,       MavESP8266Parameters::ID_UART,      sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  false},
-     {"BATT_CAPACI_MAH",    &_batt_capacity_mah,    MavESP8266Parameters::ID_BATTC,     sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  false},
-     {"BAT2_CAPACI_MAH",    &_bat2_capacity_mah,    MavESP8266Parameters::ID_BAT2C,     sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  false},
-     {"SPORT_ENABLE",       &_sport_enable,         MavESP8266Parameters::ID_SPORT,     sizeof(bool),       MAV_PARAM_TYPE_UINT8,   false},
-     {"RAW_ENABLE",         &_raw_enable,           MavESP8266Parameters::ID_RAW_ENABLE,sizeof(int8_t),     MAV_PARAM_TYPE_INT8,    false}
+     {"SW_VER",             &_sw_version,           MavESP8266Parameters::ID_FWVER,             sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  true },
+     {"DEBUG_ENABLED",      &_debug_enabled,        MavESP8266Parameters::ID_DEBUG,             sizeof(int8_t),     MAV_PARAM_TYPE_INT8,    false},
+     {"WIFI_MODE",          &_wifi_mode,            MavESP8266Parameters::ID_MODE,              sizeof(int8_t),     MAV_PARAM_TYPE_INT8,    false},
+     {"WIFI_CHANNEL",       &_wifi_channel,         MavESP8266Parameters::ID_CHANNEL,           sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  false},
+     {"WIFI_UDP_HPORT",     &_wifi_udp_hport,       MavESP8266Parameters::ID_HPORT,             sizeof(uint16_t),   MAV_PARAM_TYPE_UINT16,  false},
+     {"WIFI_UDP_CPORT",     &_wifi_udp_cport,       MavESP8266Parameters::ID_CPORT,             sizeof(uint16_t),   MAV_PARAM_TYPE_UINT16,  false},
+     {"WIFI_IPADDRESS",     &_wifi_ip_address,      MavESP8266Parameters::ID_IPADDRESS,         sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  true },
+     {"WIFI_SSID1",         &_wifi_ssid[0],         MavESP8266Parameters::ID_SSID1,             sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  false},
+     {"WIFI_SSID2",         &_wifi_ssid[4],         MavESP8266Parameters::ID_SSID2,             sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  false},
+     {"WIFI_SSID3",         &_wifi_ssid[8],         MavESP8266Parameters::ID_SSID3,             sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  false},
+     {"WIFI_SSID4",         &_wifi_ssid[12],        MavESP8266Parameters::ID_SSID4,             sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  false},
+     {"WIFI_PASSWORD1",     &_wifi_password[0],     MavESP8266Parameters::ID_PASS1,             sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  false},
+     {"WIFI_PASSWORD2",     &_wifi_password[4],     MavESP8266Parameters::ID_PASS2,             sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  false},
+     {"WIFI_PASSWORD3",     &_wifi_password[8],     MavESP8266Parameters::ID_PASS3,             sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  false},
+     {"WIFI_PASSWORD4",     &_wifi_password[12],    MavESP8266Parameters::ID_PASS4,             sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  false},
+     {"WIFI_SSIDSTA1",      &_wifi_ssidsta[0],      MavESP8266Parameters::ID_SSIDSTA1,          sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  false},
+     {"WIFI_SSIDSTA2",      &_wifi_ssidsta[4],      MavESP8266Parameters::ID_SSIDSTA2,          sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  false},
+     {"WIFI_SSIDSTA3",      &_wifi_ssidsta[8],      MavESP8266Parameters::ID_SSIDSTA3,          sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  false},
+     {"WIFI_SSIDSTA4",      &_wifi_ssidsta[12],     MavESP8266Parameters::ID_SSIDSTA4,          sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  false},
+     {"WIFI_PWDSTA1",       &_wifi_passwordsta[0],  MavESP8266Parameters::ID_PASSSTA1,          sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  false},
+     {"WIFI_PWDSTA2",       &_wifi_passwordsta[4],  MavESP8266Parameters::ID_PASSSTA2,          sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  false},
+     {"WIFI_PWDSTA3",       &_wifi_passwordsta[8],  MavESP8266Parameters::ID_PASSSTA3,          sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  false},
+     {"WIFI_PWDSTA4",       &_wifi_passwordsta[12], MavESP8266Parameters::ID_PASSSTA4,          sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  false},
+     {"WIFI_IPSTA",         &_wifi_ipsta,           MavESP8266Parameters::ID_IPSTA,             sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  false},
+     {"WIFI_GATEWAYSTA",    &_wifi_gatewaysta,      MavESP8266Parameters::ID_GATEWAYSTA,        sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  false},
+     {"WIFI_SUBNET_STA",    &_wifi_subnetsta,       MavESP8266Parameters::ID_SUBNETSTA,         sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  false},
+     {"UART_BAUDRATE",      &_uart_baud_rate,       MavESP8266Parameters::ID_UART,              sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  false},
+     {"BATT_CAPACI_MAH",    &_batt_capacity_mah,    MavESP8266Parameters::ID_BATTC,             sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  false},
+     {"BAT2_CAPACI_MAH",    &_bat2_capacity_mah,    MavESP8266Parameters::ID_BAT2C,             sizeof(uint32_t),   MAV_PARAM_TYPE_UINT32,  false},
+     {"SPORT_ENABLE",       &_sport_enable,         MavESP8266Parameters::ID_SPORT,             sizeof(bool),       MAV_PARAM_TYPE_UINT8,   false},
+     {"RAW_ENABLE",         &_raw_enable,           MavESP8266Parameters::ID_RAW_ENABLE,        sizeof(int8_t),     MAV_PARAM_TYPE_INT8,    false},
+     {"SPORT_ADDR_MODE",    &_sport_rx_addr_mode,   MavESP8266Parameters::ID_SPORT_RX_ADDR_MODE,sizeof(uint8_t),    MAV_PARAM_TYPE_UINT8,   false},
+     {"SPORT_RX_SYSID",     &_sport_rx_sysid,       MavESP8266Parameters::ID_SPORT_RX_SYSID,    sizeof(uint8_t),    MAV_PARAM_TYPE_UINT8,   false},
+     {"SPORT_RX_COMPID",    &_sport_rx_compid,      MavESP8266Parameters::ID_SPORT_RX_COMPID,   sizeof(uint8_t),    MAV_PARAM_TYPE_UINT8,   false}
 };
 
 //---------------------------------------------------------------------------------
@@ -163,6 +169,9 @@ uint32_t    MavESP8266Parameters::getBattCapacitymAh() { return _batt_capacity_m
 uint32_t    MavESP8266Parameters::getBat2CapacitymAh() { return _bat2_capacity_mah; }
 bool        MavESP8266Parameters::getSPORTenable    () { return _sport_enable;      }
 int8_t      MavESP8266Parameters::getRawEnable      () { return _raw_enable;        }
+uint8_t     MavESP8266Parameters::getSPORTRxAddressMode   () { return _sport_rx_addr_mode;    }
+uint8_t     MavESP8266Parameters::getSPORTRxSysID   () { return _sport_rx_sysid;    }
+uint8_t     MavESP8266Parameters::getSPORTRxCompID  () { return _sport_rx_compid;   }
 
 //---------------------------------------------------------------------------------
 //-- Reset all to defaults
@@ -446,4 +455,24 @@ MavESP8266Parameters::setSPORTenable(bool s_enable)
     _sport_enable = s_enable;
 }
 
+//---------------------------------------------------------------------------------
+void
+MavESP8266Parameters::setSPORTRxAddressMode(uint8_t mode)
+{
+    _sport_rx_addr_mode = mode;
+}
+
+//---------------------------------------------------------------------------------
+void
+MavESP8266Parameters::setSPORTRxSysID(uint8_t sysid)
+{
+    _sport_rx_sysid = sysid;
+}
+
+//---------------------------------------------------------------------------------
+void
+MavESP8266Parameters::setSPORTRxCompID(uint8_t compid)
+{
+    _sport_rx_compid = compid;
+}
 

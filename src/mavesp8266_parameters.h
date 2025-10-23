@@ -93,7 +93,16 @@ public:
         ID_BAT2C,
         ID_SPORT,
         ID_RAW_ENABLE,
+        ID_SPORT_RX_ADDR_MODE,
+        ID_SPORT_RX_SYSID,
+        ID_SPORT_RX_COMPID,
         ID_COUNT
+    };
+
+    enum TSPortRxAddressMode
+    {
+        AUTO = 0,
+        MANUAL = 1,
     };
 
     void        begin                       ();
@@ -120,6 +129,9 @@ public:
     uint32_t    getBat2CapacitymAh          ();
     bool        getSPORTenable              ();
     int8_t      getRawEnable                ();
+    uint8_t     getSPORTRxAddressMode       ();
+    uint8_t     getSPORTRxSysID             ();
+    uint8_t     getSPORTRxCompID            ();
 
     void        setDebugEnabled             (int8_t enabled);
     void        setWifiMode                 (int8_t mode);
@@ -138,6 +150,9 @@ public:
     void        setBattCapacitymAh          (uint32_t mAh);
     void        setBat2CapacitymAh          (uint32_t mAh);
     void        setSPORTenable              (bool s_enable);
+    void        setSPORTRxAddressMode       (uint8_t mode);
+    void        setSPORTRxSysID             (uint8_t sysid);
+    void        setSPORTRxCompID            (uint8_t compid);
 
     stMavEspParameters* getAt               (int index);
 
