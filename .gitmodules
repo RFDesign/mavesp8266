@@ -1,0 +1,3 @@
+[submodule "src/HAL/Linux/submodules/libb64"]
+	path = src/HAL/Linux/submodules/libb64
+	url = https://github.com/libb64/libb64

@@ -55,6 +55,8 @@
 
 #include "sport/autopilotselection.h"
 
+#include "rfddefs.h"
+
 const char PROGMEM kTEXTPLAIN[]  = "text/plain";
 const char PROGMEM kTEXTHTML[]   = "text/html";
 const char PROGMEM kACCESSCTL[]  = "Access-Control-Allow-Origin";
@@ -1670,7 +1672,7 @@ void handle900xParamRefresh() {
     //todo would this be better sent as json ? 
     //var mydata = JSON.parse(data);
     //type = "handle900xParamRefresh() executed. type:"+type+" num_read:"+num_read;
-    type = "{ \"request\":\"paramrefresh\", \"type\":\""+type+"\", \"num_read\":"+num_read+"}"; // valid json to browser
+    type = "{ \"request\":\"paramrefresh\", \"type\":\""+type+"\", \"num_read\":"+INT_TO_STRING(num_read)+"}"; // valid json to browser
 
     //webServer.send(200, kTEXTPLAIN, type );
      webServer.send(200, "application/json", type ); 
