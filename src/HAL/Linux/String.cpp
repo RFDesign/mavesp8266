@@ -22,7 +22,7 @@ String::String(const char *x)
 
 String::String(std::string x)
 {
-	*this = x;
+	this->assign(x);
 }
 
 String::String(size_t n)

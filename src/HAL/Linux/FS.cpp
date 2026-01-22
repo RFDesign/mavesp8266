@@ -239,8 +239,15 @@ TLinuxDir::TLinuxDir(std::string Path)
 
 bool TLinuxDir::next(void)
 {
-	struct dirent *entry = readdir(_pd);
-	return entry != nullptr;
+	if (_pd == nullptr)
+	{
+		return false;
+	}
+	else
+	{
+		struct dirent *entry = readdir(_pd);
+		return entry != nullptr;
+	}
 }
 
 File TLinuxDir::openFile(std::string s)
