@@ -54,11 +54,12 @@ void delay(int Milliseconds)
 // TSerial
 // -----------------------------------------------------------------------------
 
-void TSerial::begin(int PortNumber)
+void TSerial::begin(int BaudRate)
 {
-	std::string File = "/dev/ttyUSB" + std::to_string(PortNumber);
+	std::string File = "/dev/ttyUSB0";
 
-	_SP.reset(new rfdproxy::interfaces::TSerialPort(File, 57600, true));
+	_SP = nullptr;
+	_SP.reset(new rfdproxy::interfaces::TSerialPort(File, BaudRate, true));
 }
 
 void TSerial::end(void)
