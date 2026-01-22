@@ -8,6 +8,7 @@
 #ifndef HAL_LINUX_ESP8266MDNS_H_
 #define HAL_LINUX_ESP8266MDNS_H_
 
+#include <string>
 
 class TMDNS
 {
@@ -17,7 +18,7 @@ public:
 	void addService(std::string, std::string, int);
 };
 
-extern TMDNS& MDNS;
+extern TMDNS MDNS;
 
 
 #endif /* HAL_LINUX_ESP8266MDNS_H_ */

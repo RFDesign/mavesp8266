@@ -1,3 +1,7 @@
 [submodule "src/HAL/Linux/submodules/libb64"]
 	path = src/HAL/Linux/submodules/libb64
 	url = https://github.com/libb64/libb64
+[submodule "src/HAL/Linux/submodules/RFDProxy"]
+	path = src/HAL/Linux/submodules/RFDProxy
+	url = https://github.com/RFDesign/RFDProxy
+	branch = lib_for_rfdvideolink

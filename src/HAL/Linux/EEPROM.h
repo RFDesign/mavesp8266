@@ -21,15 +21,19 @@ public:
 	void endPacket(void);
 	int parsePacket(void);
 	uint8_t read(int Address);
-	uint8_t* getDataPtr(int Address);
+	//uint8_t* getDataPtr(int Address);
 	uint8_t* getDataPtr(void);
-	size_t getFreeSketchSpace(void);
+	//size_t getFreeSketchSpace(void);
 	void put(uint32_t, uint32_t);
 	void commit(void);
 	bool get(uint32_t Address, uint32_t &x);
+private:
+	static constexpr size_t SIZE = 1024 * 1024;
+	uint8_t _EEPROM[SIZE];
+	const std::string FILE_NAME = "eeprom.bin";
 };
 
-extern TEEPROM& EEPROM;
+extern TEEPROM EEPROM;
 
 
 #endif /* HAL_LINUX_EEPROM_H_ */

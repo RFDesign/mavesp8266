@@ -15,8 +15,8 @@ class WiFiServer
 {
 public:
 	typedef WiFiClient ClientType;
-	WiFiServer(int);
-	WiFiClient& available(void);
+	WiFiServer(int n);
+	WiFiClient available(void);
 	void begin(void);
 	void close(void);
 };

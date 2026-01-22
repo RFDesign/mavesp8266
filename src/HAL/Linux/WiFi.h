@@ -20,24 +20,24 @@
 class TWiFi
 {
 public:
-	void begin(char *, char *);
-	void disconnect(bool);
+	void begin(char *a, char *b);
+	void disconnect(bool b);
 	void macAddress(byte *p);
 	void softAPmacAddress(byte *p);
-	void mode(int);
-	void config(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
+	void mode(int x);
+	void config(uint32_t a, uint32_t b, uint32_t c, uint32_t d, uint32_t e);
 	int status(void);
 	IPAddress localIP(void);
 	void setAutoReconnect(bool);
-	void encryptionType(int);
-	void softAP(char *, char *, uint32_t);
+	void encryptionType(int a);
+	void softAP(char *a, char *b, uint32_t c);
 	IPAddress softAPIP(void);
 	void setOutputPower(float);
 };
 
 String half_mac2String(byte *p);
 
-extern TWiFi &WiFi;
+extern TWiFi WiFi;
 
 
 

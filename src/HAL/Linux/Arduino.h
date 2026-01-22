@@ -10,9 +10,15 @@
 
 #include <string>
 #include <stdio.h>
+#include <stddef.h>
+#include <stdlib.h>
+#include <stdint.h>
 
 #define IRAM_ATTR
 #define PROGMEM
+
+#define U_FLASH 0
+#define U_FS 1
 
 #define INPUT_PULLUP 1
 #define FALLING 0
@@ -45,6 +51,11 @@ public:
 		return String(*this + std::to_string(y));
 	}
 
+	/*bool operator==(const String& Other) const
+	{
+		return equals(Other);
+	}*/
+
 	char charAt(int Offet) const;
 	int indexOf(const std::string &x) const;
 	int indexOf(const char x, int n) const;
@@ -55,29 +66,32 @@ public:
 	bool endsWith(std::string s) const;
 	int length(void) const;
 
-	bool equals(String);
+	bool equals(const String&) const;
 	bool equalsConstantTime(char *);
 	bool equalsIgnoreCase(const char *);
+	bool equalsIgnoreCase(const String);
 
 	bool reserve(size_t);
 	void replace(const char *, const char *);
 	void replace(String, String);
+private:
+	//std::string _Inner;
 };
 
-extern String &emptyString;
+extern String emptyString;
 
 class Stream
 {
 public:
-	void write(char);
-	void setTimeout(int);
-	void readBytes(char *, int);
+	virtual void write(char x);
+	virtual void setTimeout(int x);
+	virtual size_t readBytes(char *Dest, int Length);
 };
 
 class HardwareSerial : public Stream
 {
 public:
-	HardwareSerial(int);
+	HardwareSerial(int PortNumber);
 };
 
 class MD5Builder

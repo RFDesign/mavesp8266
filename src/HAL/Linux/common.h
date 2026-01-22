@@ -11,12 +11,15 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <cstddef>
 #include <math.h>
 //#include <SoftwareSerial.h>
 //#include <StdioSerial.h>
 #include <Stream.h>
+#include <memory>
 //#include <Esp.h>
 #include "Arduino.h"
+#include "submodules/RFDProxy/interfaces/Serial.hpp"
 
 #define PI (M_PI)
 #define PSTR(x) (x)
@@ -39,6 +42,9 @@ public:
 	size_t write(uint8_t *message, int len);
 	size_t write(const char *);
 	void flush(void);
+	void setDebugOutput(bool b);
+private:
+	std::shared_ptr<rfdproxy::interfaces::TSerialPort> _SP;
 };
 
 
@@ -58,8 +64,12 @@ class TUpdate
 public:
 	bool hasError(void);
 	bool begin(size_t);
+	bool begin(size_t, int Index);
 	bool write(uint8_t *, size_t);
 	bool end(bool);
+	bool end(void);
+	void printError(std::string &s);
+	void printError(TSerial &s);
 };
 
 extern TUpdate &Update;

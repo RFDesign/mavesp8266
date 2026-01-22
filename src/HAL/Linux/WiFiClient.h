@@ -28,6 +28,8 @@ public:
 	String readStringUntil(char);
 	void setTimeout(int);
 	void flush(void);
+	void stop(void);
+	void setNoDelay(bool b);
 
 	/*WiFiClient operator= (WiFiClient &Other)
 	{
