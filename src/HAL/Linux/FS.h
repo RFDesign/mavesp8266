@@ -38,7 +38,7 @@ public:
 class TLinuxFile : public BaseFile
 {
 public:
-	TLinuxFile(std::string Name, std::string Path);
+	TLinuxFile(std::string Name, std::string Path, std::string Mode);
 	operator bool() const override;
 	void setTimeout(int t) override;
 	void close(void) override;
@@ -80,6 +80,7 @@ class TBaseDir
 public:
 	virtual bool next(void) = 0;
 	virtual File openFile(std::string s) = 0;
+	virtual String fileName(void) = 0;
 };
 
 class TLinuxDir : public TBaseDir
@@ -88,8 +89,10 @@ public:
 	TLinuxDir(std::string Path);
 	bool next(void) override;
 	File openFile(std::string s) override;
+	String fileName(void) override;
 private:
 	DIR *_pd;
+	dirent *_entry = nullptr;
 	std::string _Path;
 };
 
@@ -102,6 +105,7 @@ public:
 	bool next(void) override;
 	File openFile(std::string s) override;
 	std::shared_ptr<TBaseDir> GetBaseDir(void) const;
+	String fileName(void);
 private:
 	std::shared_ptr<TBaseDir> _pBaseDir;
 };
@@ -134,7 +138,7 @@ public:
 	bool rename(std::string From, std::string To);
 private:
 	std::string GetFullPath(std::string FileName);
-	const std::string BASE_DIR = "spiffs";
+	const std::string BASE_DIR = "../data";
 };
 
 

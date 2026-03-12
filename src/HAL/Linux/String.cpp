@@ -7,8 +7,8 @@
 
 #include <cctype>    // std::tolower
 #include <algorithm> // std::equal
+#include <string>
 #include "Arduino.h"
-
 
 String::String()
 {
@@ -25,14 +25,41 @@ String::String(std::string x)
 	this->assign(x);
 }
 
-String::String(size_t n)
+/**
+ * Create a new string which is a text representation of the given number.  Base 10.
+ */
+String::String(int NumberToConvertToString)
 {
-	this->reserve(n);
+	this->assign(std::to_string(NumberToConvertToString));
 }
 
-String String::substring(int start, int size) const
+/**
+ * Create a new string which is a text representation of the given number.  Base 16.
+ */
+String::String(int NumberToConvertToString, int Base)
 {
-	return String(this->substr(start, size));
+	if (Base == DEC)
+	{
+		this->assign(std::to_string(NumberToConvertToString));
+	}
+	else
+	{
+		char Temp[100];
+		sprintf(Temp, "%X", NumberToConvertToString);
+		this->assign(Temp);
+	}
+}
+
+/**
+ * Get a substring
+ *
+ * @param start - start index
+ * @param end - end index
+ * @return sub string
+ */
+String String::substring(int start, int end) const
+{
+	return String(this->substr(start, end - start));
 }
 
 String String::substring(int n) const
@@ -102,9 +129,39 @@ bool String::startsWith(std::string s)
 	return size() >= s.size() && compare(0, s.size(), s) == 0;
 }
 
+/**
+ * Check whether this string ends with the given string.
+ *
+ * @param s - The given string to compare the end to.
+ * @return true if this string ends in the given s, otherwise false.
+ *
+ */
 bool String::endsWith(std::string s) const
 {
-	return size() >= s.size() && compare(size() - s.size(), s.size(), s) == 0;
+	const char *This = c_str();
+	const char *Other = s.c_str();
+
+	int ThisLength = strlen(This);
+	int OtherLength = strlen(Other);
+
+	if (ThisLength >= OtherLength)
+	{
+		for (int n = 0; n < OtherLength; n++)
+		{
+			if (Other[n] != This[n + ThisLength - OtherLength])
+			{
+				return false;
+			}
+		}
+
+		return true;
+	}
+	else
+	{
+		return false;
+	}
+
+	//return (size() >= s.size()) && (compare(size() - s.size(), s.size(), s) == 0);
 }
 
 int String::length(void) const
@@ -158,15 +215,23 @@ void String::replace(const char *x, const char *y)
 	replace(a,b);
 }
 
+/**
+ * Replace all instances of x with y
+ */
 void String::replace(String x, String y)
 {
-	size_t n = find(x);
-	if (n != std::string::npos)
+	if (x.size() == 0)
 	{
-		std::string x = *this;
+		return;
+	}
 
-		x.replace((int)n, (int)y.size(), y);
-		*this = x;
+	size_t n = 0;
+	while ((n = this->find(x, n)) != std::string::npos)
+	{
+		std::string tmp = *this;
+		tmp.replace(n, x.size(), y);
+		*this = tmp;
+		n += y.size();
 	}
 }
 

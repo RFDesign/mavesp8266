@@ -16,7 +16,6 @@
 //#include <SoftwareSerial.h>
 //#include <StdioSerial.h>
 #include <Stream.h>
-#include <memory>
 //#include <Esp.h>
 #include "Arduino.h"
 #include "submodules/RFDProxy/interfaces/Serial.hpp"
@@ -24,28 +23,13 @@
 #define PI (M_PI)
 #define PSTR(x) (x)
 #define FPSTR(x) (x)
+#define F(string_literal) (FPSTR(PSTR(string_literal)))
+
 
 typedef uint8_t byte;
 
 uint64_t millis(void);
 void delay(int);
-
-class TSerial : public Stream
-{
-public:
-	void begin(int);
-	void end(void);
-	void setRxBufferSize(int);
-	int read(void);
-	int available(void);
-	size_t availableForWrite(void);
-	size_t write(uint8_t *message, int len);
-	size_t write(const char *);
-	void flush(void);
-	void setDebugOutput(bool b);
-private:
-	std::shared_ptr<rfdproxy::interfaces::TSerialPort> _SP;
-};
 
 
 class TESP

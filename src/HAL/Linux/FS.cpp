@@ -32,9 +32,20 @@ String BaseFile::readStringUntil(char x)
 	return Result;
 }
 
+/**
+ * Read until end of file, return as a string.
+ */
 String BaseFile::readString(void)
 {
-	return readStringUntil('\n');
+	int a;
+	String Result;
+
+	while ((a = read()) != EOF)
+	{
+		Result += a;
+	}
+
+	return Result;
 }
 
 
@@ -49,10 +60,18 @@ void BaseFile::println(String l)
 	print(l);
 }
 
-TLinuxFile::TLinuxFile(std::string Name, std::string Path)
+/**
+ * Open a linux file
+ *
+ * @param Name - The name in the ESP's file system.
+ * @param Path - The full linux path.
+ * @param Mode - The mode
+ */
+TLinuxFile::TLinuxFile(std::string Name, std::string Path, std::string Mode)
 	: _Name(Name)
 {
-	_fp = fopen(Path.c_str(), "rw");
+	//printf("Opening %s(%s) with mode %s\n", Name.c_str(), Path.c_str(), Mode.c_str());
+	_fp = fopen(Path.c_str(), Mode.c_str());
 }
 
 TLinuxFile::operator bool() const
@@ -67,6 +86,7 @@ void TLinuxFile::setTimeout(int t)
 
 void TLinuxFile::close(void)
 {
+	//printf("Closing %s\n", _Name.c_str());
 	if (_fp != nullptr)
 	{
 		fclose(_fp);
@@ -76,36 +96,79 @@ void TLinuxFile::close(void)
 
 bool TLinuxFile::available(void)
 {
-	return _fp != nullptr;
+	return _fp != nullptr && position() < size();
 }
 
+/**
+ * @return the size of this file, in bytes.
+ */
 int TLinuxFile::size(void)
 {
-	int p = ftell(_fp);
-	fseek(_fp, 0, SEEK_END);
-	int Result = ftell(_fp);
-	fseek(_fp, p, SEEK_SET);
-	return Result;
+	if (_fp == nullptr)
+	{
+		return 0;
+	}
+	else
+	{
+		//printf("Position now %d\n", position());
+		int p = ftell(_fp);
+		fseek(_fp, 0, SEEK_END);
+		int Result = ftell(_fp);
+		fseek(_fp, p, SEEK_SET);
+		//printf("Size is %d, position now %d\n", Result, position());
+		return Result;
+	}
 }
 
+/**
+ * Seek to the given position in the file.
+ */
 void TLinuxFile::seek(int Position)
 {
-	fseek(_fp, Position, SEEK_END);
+	if (_fp != nullptr)
+	{
+		fseek(_fp, Position, SEEK_SET);
+	}
 }
 
+/**
+ * @return the position within the file.
+ */
 int TLinuxFile::position(void)
 {
-	return ftell(_fp);
+	if (_fp == nullptr)
+	{
+		return 0;
+	}
+	else
+	{
+		return ftell(_fp);
+	}
 }
 
+/**
+ * Read a byte from the file.
+ *
+ * @return the byte value, or EOF.
+ */
 int TLinuxFile::read(void)
 {
-	return fgetc(_fp);
+	if (_fp == nullptr)
+	{
+		return EOF;
+	}
+	else
+	{
+		return fgetc(_fp);
+	}
 }
 
 void TLinuxFile::write(const uint8_t *Buffer, int Length)
 {
-	fwrite(Buffer, Length, 1, _fp);
+	if (_fp != nullptr)
+	{
+		fwrite(Buffer, Length, 1, _fp);
+	}
 }
 
 String TLinuxFile::name(void)
@@ -198,7 +261,7 @@ int File::read(void)
 {
 	if (_pBaseFile == nullptr)
 	{
-		return 0;
+		return EOF;
 	}
 	else
 	{
@@ -237,6 +300,11 @@ TLinuxDir::TLinuxDir(std::string Path)
 	_pd = opendir(Path.c_str());
 }
 
+/**
+ * Move to the next file.
+ *
+ * @return true if a next file, false if end of dir.
+ */
 bool TLinuxDir::next(void)
 {
 	if (_pd == nullptr)
@@ -245,17 +313,45 @@ bool TLinuxDir::next(void)
 	}
 	else
 	{
-		struct dirent *entry = readdir(_pd);
-		return entry != nullptr;
+		_entry = readdir(_pd);
+		return _entry != nullptr;
 	}
 }
 
-File TLinuxDir::openFile(std::string s)
+/**
+ * Open the current file with the given mode.
+ *
+ * @param Mode
+ * @return the opened filed.
+ */
+File TLinuxDir::openFile(std::string Mode)
 {
-	std::shared_ptr<BaseFile> LF(new TLinuxFile(s, _Path + "/" + s));
-	return File(LF);
+	if (_entry == nullptr)
+	{
+		return File();
+	}
+	else
+	{
+		std::string Name(_entry->d_name);
+		std::shared_ptr<BaseFile> LF(new TLinuxFile(Name, _Path + "/" + Name, Mode));
+		return File(LF);
+	}
 }
 
+/**
+ * @return the name of the current file.
+ */
+String TLinuxDir::fileName(void)
+{
+	if (_entry == nullptr)
+	{
+		return "";
+	}
+	else
+	{
+		return String(_entry->d_name);
+	}
+}
 
 Dir::Dir()
 {
@@ -283,11 +379,17 @@ bool Dir::next(void)
 	}
 }
 
-File Dir::openFile(std::string s)
+/**
+ * Open the current file with the given mode.
+ *
+ * @param Mode
+ * @return the opened filed.
+ */
+File Dir::openFile(std::string Mode)
 {
 	if (_pBaseDir != nullptr)
 	{
-		return _pBaseDir->openFile(s);
+		return _pBaseDir->openFile(Mode);
 	}
 	else
 	{
@@ -298,6 +400,21 @@ File Dir::openFile(std::string s)
 std::shared_ptr<TBaseDir> Dir::GetBaseDir(void) const
 {
 	return _pBaseDir;
+}
+
+/**
+ * @return the name of the current file.
+ */
+String Dir::fileName(void)
+{
+	if (_pBaseDir != nullptr)
+	{
+		return _pBaseDir->fileName();
+	}
+	else
+	{
+		return "";
+	}
 }
 
 namespace fs
@@ -316,16 +433,35 @@ bool TSPIFFS::begin(void)
 	return true;
 }
 
-File TSPIFFS::open(String s, const char *)
+/**
+ * Open a file with the given name
+ *
+ * @param s - File name
+ * @param Mode
+ * @return the opened file.
+ */
+File TSPIFFS::open(String s, const char *Mode)
 {
-	std::shared_ptr<BaseFile> lf(new TLinuxFile(s, GetFullPath(s)));
+	std::shared_ptr<BaseFile> lf(new TLinuxFile(s, GetFullPath(s), std::string(Mode)));
 
 	return File(lf);
 }
 
+/**
+ * @return whether a file of the given name exists.
+ */
 bool TSPIFFS::exists(std::__cxx11::basic_string<char> s)
 {
-	return access(s.c_str(), F_OK) == 0;
+	//printf("TSPIFFS::exists %s\n", s.c_str());
+
+	s = GetFullPath(s);
+	//printf("\tFull path:  %s\n", s.c_str());
+
+	bool Result = access(s.c_str(), F_OK) == 0;
+
+	//printf("\t%sFound\n", Result ? "" : "Not ");
+
+	return Result;
 }
 
 void TSPIFFS::remove(int Key)
@@ -335,6 +471,8 @@ void TSPIFFS::remove(int Key)
 
 void TSPIFFS::remove(String Key)
 {
+	//printf("Deleting %s\n", Key.c_str());
+
 	::remove(GetFullPath(Key).c_str());
 }
 
@@ -354,8 +492,16 @@ bool TSPIFFS::rename(std::string From, std::string To)
 	return ::rename(From.c_str(), To.c_str()) == 0;
 }
 
+/**
+ * Get the full path of the file with the given name.
+ */
 std::string TSPIFFS::GetFullPath(std::string FileName)
 {
+	if (FileName.size() != 0 && FileName[0] == '/')
+	{
+		FileName = FileName.substr(1, FileName.size() - 1);
+	}
+
 	return BASE_DIR + "/" + FileName;
 }
 
@@ -370,7 +516,6 @@ int system_get_flash_size_map(void)
 	//Only used to display info to the user.
 	return 0;
 }
-
 
 
 

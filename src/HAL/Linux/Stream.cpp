@@ -9,25 +9,15 @@
 #include "Arduino.h"
 #include "submodules/libb64/include/libb64/cencode.h"
 
-
-void Stream::write(char x)
-{
-
-}
-
-void Stream::setTimeout(int x)
-{
-
-}
-
-size_t Stream::readBytes(char *Dest, int Length)
-{
-	return Length;
-}
-
+/**
+ * Create a new HardwareSerial
+ *
+ * @param - The port number, starting with 1.
+ */
 HardwareSerial::HardwareSerial(int PortNumber)
+ : TSerial(PortNumber)
 {
-
+	begin(57600);
 }
 
 void MD5Builder::begin(void)
@@ -129,5 +119,26 @@ void memccpy_P(void *Dest, void *Src, int QTY, size_t Size)
 {
 	memcpy(Dest, Src, QTY * Size);
 }
+
+void ArduinoPrint(const char *s)
+{
+	printf(s);
+}
+
+void ArduinoPrint(String s)
+{
+	printf(s.c_str());
+}
+
+void ArduinoPrintLn(const char *s)
+{
+	printf("%s\n", s);
+}
+
+void ArduinoPrintLn(String s)
+{
+	printf("%s\n", s.c_str());
+}
+
 
 

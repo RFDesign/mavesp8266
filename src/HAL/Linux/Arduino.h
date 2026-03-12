@@ -13,6 +13,9 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <memory>
+#include <map>
+#include "submodules/RFDProxy/interfaces/Serial.hpp"
 
 #define IRAM_ATTR
 #define PROGMEM
@@ -24,31 +27,59 @@
 #define FALLING 0
 #define DEBUGV printf
 
+#define ENABLE_SOFTDEBUG
+
+#define F(string_literal) (FPSTR(PSTR(string_literal)))
+
+#define DEC 10
+#define HEX 16
+
+/**
+ * Emulates Arduino's String class.  Extends std::string
+ */
 class String : public std::string
 {
 public:
 	String();
 	String(const char *);
 	String(std::string);
-	String(size_t n);
+	String(int NumberToConvertToString);
+	String(int NumberToConvertToString, int Base);
 
 	String substring(int, int) const;
 	String substring(int n) const;
 	int toInt(void) const;
 
-	String operator= (const char *x)
+	String& operator=(const char *x)
 	{
-		return String(x);
+		this->assign(x ? x : "");
+		return *this;
 	}
 
-	String operator= (std::string x)
+	String& operator=(std::string x)
 	{
-		return String(x);
+		this->assign(x);
+		return *this;
 	}
 
-	String operator+(int y)
+	String operator+(int y) const
 	{
-		return String(*this + std::to_string(y));
+		return String(std::string(*this) + std::to_string(y));
+	}
+
+	String operator+(char y) const
+	{
+		return String(std::string(*this) + y);
+	}
+
+	String operator+(const char *y) const
+	{
+		return String(std::string(*this) + (y ? y : ""));
+	}
+
+	String operator+(const String &y) const
+	{
+		return String(std::string(*this) + std::string(y));
 	}
 
 	/*bool operator==(const String& Other) const
@@ -80,15 +111,48 @@ private:
 
 extern String emptyString;
 
+/**
+ * Generic stream interface
+ */
 class Stream
 {
 public:
-	virtual void write(char x);
-	virtual void setTimeout(int x);
-	virtual size_t readBytes(char *Dest, int Length);
+	virtual void write(char x) = 0;
+	virtual void setTimeout(int x) = 0;
+	virtual size_t readBytes(char *Dest, int Length) = 0;
 };
 
-class HardwareSerial : public Stream
+/**
+ * A wrapper of a serial port, where there can be multiple such concurrent wrappers
+ * for one serial port.
+ */
+class TSerial : public Stream
+{
+public:
+	TSerial();
+	TSerial(int PortNumber);
+	void begin(int);
+	void end(void);
+	void setTimeout(int x) override;
+	void setRxBufferSize(int);
+	int read(void);
+	size_t readBytes(char *Dest, int Length) override;
+	int available(void);
+	size_t availableForWrite(void);
+	size_t write(uint8_t *message, int len);
+	size_t write(const char *);
+	void write(char x) override;
+	void flush(void);
+	void setDebugOutput(bool b);
+private:
+	size_t readBytesWithTimeout(char *Dest, int Length);
+	int _PortNumber = 1;
+	int _ReadTimeout = 0;
+	std::shared_ptr<rfdproxy::interfaces::TSerialPort> _SP;
+	static std::shared_ptr<rfdproxy::interfaces::TSerialPort> GetPort(int PortNumber, int BaudRate);
+};
+
+class HardwareSerial : public TSerial
 {
 public:
 	HardwareSerial(int PortNumber);
@@ -134,6 +198,11 @@ void yield(void);
 
 size_t strlen_P(const void *);
 void memccpy_P(void *, void *, int, size_t);
+
+void ArduinoPrint(const char *s);
+void ArduinoPrint(String s);
+void ArduinoPrintLn(const char *s);
+void ArduinoPrintLn(String s);
 
 #define RANDOM_REG32 GetRandom32()
 

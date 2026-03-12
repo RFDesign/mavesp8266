@@ -538,6 +538,7 @@ void ESP8266WebServerTemplate<ServerType>::_streamFileCore(const size_t fileSize
 {
   using namespace mime;
   setContentLength(fileSize);
+
   if (fileName.endsWith(String(FPSTR(mimeTable[gz].endsWith))) &&
       contentType != String(FPSTR(mimeTable[gz].mimeType)) &&
       contentType != String(FPSTR(mimeTable[none].mimeType))) {
