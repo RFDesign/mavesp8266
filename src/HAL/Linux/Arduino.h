@@ -67,6 +67,11 @@ public:
 		return String(std::string(*this) + std::to_string(y));
 	}
 
+	String operator+(uint16_t y) const
+	{
+		return String(std::string(*this) + std::to_string(y));
+	}
+
 	String operator+(char y) const
 	{
 		return String(std::string(*this) + y);
@@ -80,6 +85,54 @@ public:
 	String operator+(const String &y) const
 	{
 		return String(std::string(*this) + std::string(y));
+	}
+
+	String& operator+=(int y)
+	{
+		this->append(std::to_string(y));
+		return *this;
+	}
+
+	String& operator+=(long y)
+	{
+		this->append(std::to_string(y));
+		return *this;
+	}
+
+	String& operator+=(unsigned int y)
+	{
+		this->append(std::to_string(y));
+		return *this;
+	}
+
+	String& operator+=(unsigned long y)
+	{
+		this->append(std::to_string(y));
+		return *this;
+	}
+
+	String& operator+=(uint16_t y)
+	{
+		this->append(std::to_string(y));
+		return *this;
+	}
+
+	String& operator+=(char y)
+	{
+		this->push_back(y);
+		return *this;
+	}
+
+	String& operator+=(const char *y)
+	{
+		this->append(y ? y : "");
+		return *this;
+	}
+
+	String& operator+=(const String &y)
+	{
+		this->append(std::string(y));
+		return *this;
 	}
 
 	/*bool operator==(const String& Other) const

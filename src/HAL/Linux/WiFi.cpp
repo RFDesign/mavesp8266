@@ -6,7 +6,7 @@
  */
 
 #include "WiFi.h"
-
+#include "submodules/RFDProxy/RFDLib/Net/Net.hpp"
 
 void TWiFi::begin(char *a, char *b)
 {
@@ -20,12 +20,18 @@ void TWiFi::disconnect(bool b)
 
 void TWiFi::macAddress(byte *p)
 {
+	uint64_t mac = RFDLib::Net::GetLocalMACAddress();
+	uint8_t *pMAC = (uint8_t *)&mac;
 
+	for (int n = 0; n < 6; n++)
+	{
+		p[n] = pMAC[5 - n];
+	}
 }
 
 void TWiFi::softAPmacAddress(byte *p)
 {
-
+	macAddress(p);
 }
 
 void TWiFi::mode(int x)
@@ -45,7 +51,7 @@ int TWiFi::status(void)
 
 IPAddress TWiFi::localIP(void)
 {
-	return IPAddress();
+	return IPAddress(RFDLib::Net::GetLocalIPAddress());
 }
 
 void TWiFi::setAutoReconnect(bool)
@@ -65,7 +71,7 @@ void TWiFi::softAP(char *a, char *b, uint32_t c)
 
 IPAddress TWiFi::softAPIP(void)
 {
-	return IPAddress();
+	return IPAddress(RFDLib::Net::GetLocalIPAddress());
 }
 
 void TWiFi::setOutputPower(float)
@@ -74,4 +80,3 @@ void TWiFi::setOutputPower(float)
 }
 
 TWiFi WiFi;
-

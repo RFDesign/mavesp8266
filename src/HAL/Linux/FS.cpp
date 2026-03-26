@@ -42,7 +42,7 @@ String BaseFile::readString(void)
 
 	while ((a = read()) != EOF)
 	{
-		Result += a;
+		Result += (char)a;
 	}
 
 	return Result;
