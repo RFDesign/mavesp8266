@@ -11,8 +11,9 @@
 /**
  * Create a new TTCPServer, listening on PortNumber
  */
-TTCPServer::TTCPServer(uint16_t PortNumber)
-	: rfdproxy::interfaces::TBaseTCPServer<TWiFiServerClientConnection>(PortNumber == 80 ? 8080 : PortNumber, 10000, false)
+TTCPServer::TTCPServer(uint16_t PortNumber, RFDLib::Setting::TReadOnlySetting<bool> &ServerOpen)
+	: rfdproxy::interfaces::TBaseTCPServer<TWiFiServerClientConnection>(PortNumber == 80 ? 8080 : PortNumber, 10000, false),
+	  _ServerOpen(ServerOpen)
 {
 }
 
@@ -29,7 +30,7 @@ TTCPServer::~TTCPServer()
  */
 void TTCPServer::AcceptNewClient(rfdproxy::interfaces::TTCPServerClientConnection &Conn)
 {
-	std::shared_ptr<TWiFiServerClientConnection> pWSCC(new TWiFiServerClientConnection(Conn));
+	TWiFiServerClientConnection *pWSCC = new TWiFiServerClientConnection(Conn);
 
 	AddClient(*pWSCC);
 	MUTEX_LOCK(_Mutex);
@@ -51,7 +52,7 @@ std::string TTCPServer::GetTCPServerName(void)
  *
  * @return the next client connection, or nullptr if no next connection.
  */
-std::shared_ptr<TWiFiServerClientConnection> TTCPServer::Accept(void)
+std::shared_ptr<TWiFiClientDisconnector> TTCPServer::Accept(void)
 {
 	MUTEX_LOCK(_Mutex);
 	if (_AcceptQueue.size() == 0)
@@ -60,7 +61,7 @@ std::shared_ptr<TWiFiServerClientConnection> TTCPServer::Accept(void)
 	}
 	else
 	{
-		std::shared_ptr<TWiFiServerClientConnection> pResult(_AcceptQueue.front());
+		std::shared_ptr<TWiFiClientDisconnector> pResult(new TWiFiClientDisconnector(*_AcceptQueue.front(), _ServerOpen));
 		_AcceptQueue.pop();
 		printf("TTCPServer::Accept returned a new connection\n");
 		return pResult;
@@ -97,7 +98,7 @@ void WiFiServer::begin(void)
 {
 	if (_pTCPServer == nullptr)
 	{
-		_pTCPServer = new TTCPServer(_PortNumber);
+		_pTCPServer = new TTCPServer(_PortNumber, *this);
 	}
 }
 
@@ -111,4 +112,12 @@ void WiFiServer::close(void)
 		delete _pTCPServer;
 		_pTCPServer = nullptr;
 	}
+}
+
+/**
+ * @return whether server is open.
+ */
+bool WiFiServer::GetValue(void)
+{
+	return _pTCPServer != nullptr;
 }

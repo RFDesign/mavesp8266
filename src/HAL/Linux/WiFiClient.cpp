@@ -15,9 +15,13 @@ WiFiClient::WiFiClient()
  * Create a new wifi client
  * @param pConn - Can be nullptr if no actual connection.
  */
-WiFiClient::WiFiClient(std::shared_ptr<TWiFiServerClientConnection> pConn)
+WiFiClient::WiFiClient(std::shared_ptr<TWiFiClientDisconnector> pConn)
 {
 	_pConnection = pConn;
+	if (pConn != nullptr)
+	{
+		//printf("WiFiClient using TWiFiClientDisconnector #%d\n", pConn->GetNumber());
+	}
 }
 
 /**
@@ -26,6 +30,10 @@ WiFiClient::WiFiClient(std::shared_ptr<TWiFiServerClientConnection> pConn)
 WiFiClient::WiFiClient(const WiFiClient &ToCopy)
 {
 	_pConnection = ToCopy._pConnection;
+	if (_pConnection != nullptr)
+	{
+		//printf("WiFiClient cloning other and using TWiFiClientDisconnector #%d\n", _pConnection->GetNumber());
+	}
 }
 
 /**
@@ -33,12 +41,12 @@ WiFiClient::WiFiClient(const WiFiClient &ToCopy)
  */
 bool WiFiClient::connected(void)
 {
-	return _pConnection != nullptr && _pConnection->GetConnection().IsConnected();
+	return _pConnection != nullptr && _pConnection->GetConn().GetConnection().IsConnected();
 }
 
 size_t WiFiClient::available(void)
 {
-	return _pConnection == nullptr ? 0 : _pConnection->GetRxAvailable();
+	return _pConnection == nullptr ? 0 : _pConnection->GetConn().GetRxAvailable();
 }
 
 /**
@@ -61,7 +69,7 @@ size_t WiFiClient::write(const char *buf, int n)
 			printf(">%c", buf[i]);
 		}*/
 
-		return _pConnection->Write((char *)buf, n);
+		return _pConnection->GetConn().Write((char *)buf, n);
 	}
 }
 
@@ -146,7 +154,7 @@ int WiFiClient::read(void)
 	}
 	else
 	{
-		int Result = _pConnection->ReadByte();
+		int Result = _pConnection->GetConn().ReadByte();
 		/*if (Result != EOF)
 		{
 			printf("<%c", Result);
@@ -170,7 +178,7 @@ size_t WiFiClient::readBytes(uint8_t *x, size_t n)
 	}
 	else
 	{
-		int Result = _pConnection->Read((char *)x, n);
+		int Result = _pConnection->GetConn().Read((char *)x, n);
 		/*if (Result != 0)
 		{
 			printf("WiFiClient::readBytes got %d bytes\n", Result);
@@ -247,11 +255,6 @@ void WiFiClient::stop(void)
 void WiFiClient::setNoDelay(bool b)
 {
 
-}
-
-TWiFiServerClientConnection* WiFiClient::GetConnection(void) const
-{
-	return _pConnection.get();
 }
 
 WiFiClient::operator bool() const

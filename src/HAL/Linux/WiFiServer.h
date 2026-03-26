@@ -20,19 +20,20 @@
 class TTCPServer : public rfdproxy::interfaces::TBaseTCPServer<TWiFiServerClientConnection>
 {
 public:
-	TTCPServer(uint16_t PortNumber);
+	TTCPServer(uint16_t PortNumber, RFDLib::Setting::TReadOnlySetting<bool> &ServerOpen);
 	~TTCPServer();
 	void AcceptNewClient(rfdproxy::interfaces::TTCPServerClientConnection &Conn) override;
 	std::string GetTCPServerName(void) override;
-	std::shared_ptr<TWiFiServerClientConnection> Accept(void);
+	std::shared_ptr<TWiFiClientDisconnector> Accept(void);
 private:
-	std::queue<std::shared_ptr<TWiFiServerClientConnection>> _AcceptQueue;
+	std::queue<TWiFiServerClientConnection *> _AcceptQueue;
+	RFDLib::Setting::TReadOnlySetting<bool> &_ServerOpen;
 };
 
 /**
  * A TCP server.
  */
-class WiFiServer
+class WiFiServer : public RFDLib::Setting::TReadOnlySetting<bool>
 {
 public:
 	typedef WiFiClient ClientType;
@@ -40,6 +41,7 @@ public:
 	WiFiClient available(void);
 	void begin(void);
 	void close(void);
+	bool GetValue(void) override;
 private:
 	TTCPServer *_pTCPServer = nullptr;
 	uint16_t _PortNumber;

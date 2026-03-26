@@ -16,14 +16,18 @@
 class SoftwareSerial
 {
 public:
+	SoftwareSerial();
 	void begin(int, int, bool, bool, bool);
 	size_t write(char *message, int len);
-	size_t write(uint8_t);
+	void write(uint8_t);
 	void enableTx(bool Enable);
 	void enableIntTx(bool Enable);
 	void print(std::string Line);
 	void println(std::string Line);
 	void flush(void);
+private:
+	bool _TxEnabled = false;
+	TSerial _Serial;
 };
 
 

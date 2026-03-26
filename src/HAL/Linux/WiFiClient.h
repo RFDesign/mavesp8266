@@ -23,7 +23,7 @@ class WiFiClient
 {
 public:
 	WiFiClient();
-	WiFiClient(std::shared_ptr<TWiFiServerClientConnection> pConn);
+	WiFiClient(std::shared_ptr<TWiFiClientDisconnector> pConn);
 	WiFiClient(const WiFiClient &ToCopy);
 	bool connected(void);
 	size_t available(void);
@@ -39,8 +39,6 @@ public:
 	void stop(void);
 	void setNoDelay(bool b);
 
-	TWiFiServerClientConnection* GetConnection(void) const;
-
 	/*WiFiClient operator= (WiFiClient &Other)
 	{
 		return WiFiClient(Other);
@@ -54,7 +52,7 @@ public:
 	operator bool() const;
 
 private:
-	std::shared_ptr<TWiFiServerClientConnection> _pConnection;
+	std::shared_ptr<TWiFiClientDisconnector> _pConnection;
 };
 
 uint8_t wifi_softap_get_station_num(void);

@@ -489,7 +489,7 @@ Dir TSPIFFS::openDir(std::string d)
 
 bool TSPIFFS::rename(std::string From, std::string To)
 {
-	return ::rename(From.c_str(), To.c_str()) == 0;
+	return ::rename(GetFullPath(From).c_str(), GetFullPath(To).c_str()) == 0;
 }
 
 /**
