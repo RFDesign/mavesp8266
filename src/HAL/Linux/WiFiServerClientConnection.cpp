@@ -5,7 +5,7 @@
  *      Author: snh
  */
 
-
+#include "debug.hpp"
 #include "WiFiServerClientConnection.hpp"
 
 static int gNumber = 0;
@@ -63,15 +63,16 @@ rfdproxy::interfaces::TTCPServerClientConnection& TWiFiServerClientConnection::G
 
 void TWiFiServerClientConnection::DoClose(void)
 {
-	//printf("TWiFiServerClientConnection %d DoClose Stop\n", _Number);
-	Stop();
-	//printf("TWiFiServerClientConnection %d DoClose WaitUntilTxComplete\n", _Number);
+	Debug_Printf("TWiFiServerClientConnection %d DoClose WaitUntilTxComplete\n", _Number);
 	WaitUntilTxComplete();
-	//printf("TWiFiServerClientConnection %d DoClose GetConnection().WaitUntilTxComplete()\n", _Number);
+	Debug_Printf("TWiFiServerClientConnection %d DoClose GetConnection().WaitUntilTxComplete()\n", _Number);
 	GetConnection().WaitUntilTxComplete();
-	//printf("TWiFiServerClientConnection %d DoClose GetConnection().Close()\n", _Number);
+	rfdproxy::time::MSleep(2000);
+	Debug_Printf("TWiFiServerClientConnection %d DoClose Stop\n", _Number);
+	Stop();
+	Debug_Printf("TWiFiServerClientConnection %d DoClose GetConnection().Close()\n", _Number);
 	GetConnection().Close();
-	//printf("TWiFiServerClientConnection %d DoClose Done\n", _Number);
+	Debug_Printf("TWiFiServerClientConnection %d DoClose Done\n", _Number);
 	_State = CLOSED;
 }
 

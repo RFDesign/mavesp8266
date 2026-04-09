@@ -9,6 +9,7 @@
 #include <algorithm> // std::equal
 #include <string>
 #include "Arduino.h"
+#include "submodules/RFDProxy/RFDLib/Text/Text.hpp"
 
 String::String()
 {
@@ -92,6 +93,9 @@ int String::indexOf(const char x) const
 	return find(x);
 }
 
+/**
+ * Trim the white space off the start and end of this string.
+ */
 void String::trim(void)
 {
 	int FirstNonSpace = -1;
@@ -120,13 +124,16 @@ void String::trim(void)
 	}
 	else
 	{
-		*this = this->substr(FirstNonSpace, LastNonSpace - FirstNonSpace);
+		*this = this->substr(FirstNonSpace, LastNonSpace - FirstNonSpace + 1);
 	}
 }
 
+/**
+ * @return whether this string starts with the given string.
+ */
 bool String::startsWith(std::string s)
 {
-	return size() >= s.size() && compare(0, s.size(), s) == 0;
+	return (size() >= s.size()) && (compare(0, s.size(), s) == 0);
 }
 
 /**
@@ -191,20 +198,37 @@ bool iequals(const std::string& a, const std::string& b)
            std::equal(a.begin(), a.end(), b.begin(), ichar_equals);
 }
 
+/**
+ * Case-insensitive compare
+ *
+ * @param x - The string to compare to.
+ * @return true if this string matches x, else false.
+ */
 bool String::equalsIgnoreCase(const char *x)
 {
 	std::string b(x);
-	return iequals(*this, b);
+
+	return RFDLib::Text::GetMatchCaseInsensitive(*this, b);
 }
 
+/**
+ * Case-insensitive compare
+ *
+ * @param x - The string to compare to.
+ * @return true if this string matches x, else false.
+ */
 bool String::equalsIgnoreCase(const String x)
 {
-	return iequals(*this, x);
+	return RFDLib::Text::GetMatchCaseInsensitive(*this, x);
 }
 
+/**
+ * Does nothing
+ *
+ * @return true
+ */
 bool String::reserve(size_t n)
 {
-	this->resize(n);
 	return true;
 }
 
