@@ -332,7 +332,7 @@ File TLinuxDir::openFile(std::string Mode)
 	}
 	else
 	{
-		std::string Name(_entry->d_name);
+		std::string Name(std::string("/") + std::string(_entry->d_name));
 		std::shared_ptr<BaseFile> LF(new TLinuxFile(Name, _Path + "/" + Name, Mode));
 		return File(LF);
 	}
