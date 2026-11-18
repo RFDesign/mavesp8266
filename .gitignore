@@ -11,3 +11,4 @@ research
 data\.bak/
 
 .pio/build/
+.pio/dependencies/
