@@ -1,24 +1,22 @@
-@SET VERSION=V992.16
+@echo off
+setlocal
+set "VERSION=V992.17"
 
-del .pio\build\esp12e\firmware.bin
-del .pio\build\esp12e\spiffs.bin
-del firmware.bin
-del spiffs.bin
+platformio run -e esp12e -t buildprog || exit /b 1
+platformio run -e esp12e -t buildfs || exit /b 1
 
-@REM build firmare.bin binary:
-platformio run
-@REM build spiffs.bin binary:
-platformio run -t buildfs
+set "FIRMWARE=.pio\build\esp12e\firmware.bin"
+set "SPIFFS=.pio\build\esp12e\spiffs.bin"
+if not exist "%FIRMWARE%" (
+    echo Missing build output: %FIRMWARE% >&2
+    exit /b 1
+)
+if not exist "%SPIFFS%" (
+    echo Missing build output: %SPIFFS% >&2
+    exit /b 1
+)
 
-@REM copy the target binaries to a releasable name:
-copy .pio\build\esp12e\spiffs.bin .
-del RFDTxMod-v2_spiffs%VERSION%.bin
-rename spiffs.bin RFDTxMod-v2_spiffs%VERSION%.bin
-copy .pio\build\esp12e\firmware.bin .
-del RFDTxMod-v2_%VERSION%.bin
-rename firmware.bin RFDTxMod-v2_%VERSION%.bin
-
-echo ------------------------------------------------------------------
-@REM show user:
-@dir RFDTx*.bin
+copy /y "%FIRMWARE%" "RFDTxMod-v2_%VERSION%.bin" || exit /b 1
+copy /y "%SPIFFS%" "RFDTxMod-v2_spiffs%VERSION%.bin" || exit /b 1
+dir "RFDTxMod-v2_%VERSION%.bin" "RFDTxMod-v2_spiffs%VERSION%.bin"
 pause
