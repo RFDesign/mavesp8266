@@ -34,6 +34,8 @@
 #define DEC 10
 #define HEX 16
 
+#define TXMOD_HAL
+
 /**
  * Emulates Arduino's String class.  Extends std::string
  */

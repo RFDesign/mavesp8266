@@ -152,6 +152,14 @@ MavESP8266Vehicle::_readMessage()
         int result = Serial.read();
         if (result >= 0)
         {
+        	uint8_t c = result;
+        	if (result == 0xFE || result == 0xFD)
+        	{
+        		//printf("Start of packet!\n");
+        	}
+
+        	//printf("<%02X ", c);
+
             // Parsing
             uint8_t last_parse_error = _rxstatus.parse_error;
             msgReceived = mavlink_frame_char_buffer(&_rxmsg,

@@ -1,0 +1,97 @@
+<!doctype html><!-- Update Success --><html><head><title>RFDesign TXMOD</title>
+  <style>
+  body{max-width:800px;width:90%;background-color:#f1f1f1;font-family:Verdana;margin:20px auto}
+  a,a:active,a:visited{color:#000;text-decoration:none;display:inline-block}
+  h1{font-weight:normal}
+  h2{font-size:20px;font-weight:normal;margin:0 0 15px 0;width:100%}
+  p{font-size:12px;font-weight:normal;padding:0 0 15px 0;margin:0}
+  p:last-child{padding-bottom:0}
+  .b{margin:0 0 15px 0;background-color:#ffffff;padding:15px;-webkit-box-shadow:0px 0px 5px 0px rgba(200,200,200,1);-moz-box-shadow:0px 0px 5px 0px rgba(200,200,200,1);box-shadow:0px 0px 5px 0px rgba(200,200,200,1);border-radius:5px}
+  .hd {margin:10px 0}
+  .gr{background-image:linear-gradient(to top right,#41f47f,#41e2f4);background-color:#41f47f}
+  .pr{background-color:#f1f1f1;margin:20px 0;border-radius:5px;margin:20px 0 10px 0;display:inline-block;width:100%}
+  .pr p{color:#fff;border:none;font-size:17px;border-radius:5px;padding:10px;box-sizing:border-box;display:inline-block;visibility:hidden;text-align:center;overflow:visible;white-space:nowrap;width:0}
+  </style>
+  <script>
+  
+  var timeleft = 600;
+  var cameback = false;
+  var message = ' Preparing to reboot...'
+  
+  function starttimer() {
+      var downloadTimer = setInterval(function(){
+        var percent = --timeleft;
+        percent = 100*percent/600;
+        document.getElementById("progressBar").style.width = (100 - percent) + '%';
+        document.getElementById("progressBar").innerHTML = (100 - percent).toFixed() + '%' + message;
+  
+        if  ( cameback == true ) { 
+          document.getElementById("progressBar").style.width = '100%';
+          document.getElementById("progressBar").innerHTML = '100% Device has successfully booted';
+          clearInterval(downloadTimer);
+        }
+        
+        if(timeleft <= 0) {
+          document.getElementById("progressBar").style.width = '100%';
+          document.getElementById("progressBar").innerHTML = '100% Check WiFi connection and reload page';
+          clearInterval(downloadTimer);
+        }
+      },150);
+
+      var tryoutTimer = setInterval(function(){
+        if (cameback) {
+          clearInterval(tryoutTimer);
+          window.location.href = '/updatepage';
+        }
+        else {
+          checkforserverback();
+        }
+      },5000);
+  }
+  
+  
+  function checkforserverback() { 
+  
+    var xhttp = new XMLHttpRequest();
+    var mytimeout = false;
+    xhttp.timeout = 5000; // 15 secs
+    xhttp.onreadystatechange = function() {
+      if (this.readyState == 4 && this.status == 200) {
+        cameback = true;
+        return true;
+      }
+    };
+    xhttp.ontimeout = function(e) {mytimeout = true;}; 
+    xhttp.open("GET", "/", true); 
+    xhttp.send();
+  
+    if ( mytimeout == true ) return false;
+  
+  return false;
+  } 
+  
+  function loadDoc() {
+    timeleft = 600;
+    document.getElementById("progressBar").style.visibility = 'visible';
+    starttimer();
+    var xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function() {
+      if (this.readyState == 4 && this.status == 200) {
+        message = " Device is rebooting now";
+        //this.responseText;
+      }
+    };
+    xhttp.open("GET", "/reboot", true);
+    xhttp.send();
+  }
+  </script>
+  </head>
+  <body><div class="hd"><h1><a href="/">TXMOD</a></h1></div>
+  <div class="b f"><h2>File upload successful</h2>
+  <p>You should reboot your TXMOD now! On next reboot it may also reflash the RFD900x modem that is inside it.</p>
+  <p id=doit><button type="button" onclick="loadDoc()">Reboot now</button></p>
+  <p>This may take up to a full minute after you turn it back on. Please, be patient as it does this.</p>
+  <div class="pr"><p class="gr" id="progressBar">0%</p></div>
+  </body>
+  </html>
+  

@@ -28,29 +28,37 @@ void debug_init()
 
 void debug_println(String line)
 {
-#ifdef DEBUG_WEB
-    char buff[64];
-    memset(buff, 0, sizeof(buff));
-    line += "\n";
-    line.toCharArray(buff, sizeof(buff));
-    uint8_t len = line.length() > sizeof(buff) ? sizeof(buff) : line.length();
-    webdebug_publish(buff, len);
+#ifdef TXMOD_HAL
+	printf("%s\n", line.c_str());
 #else
-    DEBUG_SERIAL.println(line);
+	#ifdef DEBUG_WEB
+		char buff[64];
+		memset(buff, 0, sizeof(buff));
+		line += "\n";
+		line.toCharArray(buff, sizeof(buff));
+		uint8_t len = line.length() > sizeof(buff) ? sizeof(buff) : line.length();
+		webdebug_publish(buff, len);
+	#else
+		DEBUG_SERIAL.println(line);
+	#endif
 #endif
 }
 
 void debug_print(String str)
 {
-#ifdef DEBUG_WEB
-    char buff[64];
-    memset(buff, 0, sizeof(buff));
-    str.toCharArray(buff, sizeof(buff));
-    uint8_t len = str.length() > sizeof(buff) ? sizeof(buff) : str.length();
-    webdebug_publish(buff, len);
+#ifdef TXMOD_HAL
+	printf("%s", str.c_str());
 #else
-    DEBUG_SERIAL.print(str);
-#endif    
+	#ifdef DEBUG_WEB
+		char buff[64];
+		memset(buff, 0, sizeof(buff));
+		str.toCharArray(buff, sizeof(buff));
+		uint8_t len = str.length() > sizeof(buff) ? sizeof(buff) : str.length();
+		webdebug_publish(buff, len);
+	#else
+		DEBUG_SERIAL.print(str);
+	#endif
+#endif
 }
 
 void debug_flush()

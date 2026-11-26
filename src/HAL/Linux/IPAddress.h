@@ -35,7 +35,9 @@ public:
 
 	operator uint32_t() const;
 private:
+	//_Octet[0] is e.g. 192.
 	uint8_t _Octets[4];
+	void Reverse(const uint8_t *pIn, uint8_t *pOut) const;
 };
 
 

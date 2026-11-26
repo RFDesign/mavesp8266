@@ -170,7 +170,7 @@ int TSerial::read(void)
 	}
 	else
 	{
-		return Result;
+		return (uint8_t)Result;
 	}
 }
 
@@ -190,6 +190,15 @@ size_t TSerial::readBytes(char *Dest, int Length)
 	else
 	{
 		int Result = readBytesWithTimeout(Dest, Length);
+
+		for (int n = 0; n < Result; n++)
+		{
+			uint8_t c = Dest[n];
+			if (c == 0xFE || c == 0xFD)
+			{
+				//printf("Start of packet!\n");
+			}
+		}
 		/*for (int n = 0; n < Result; n++)
 		{
 			putchar('<');

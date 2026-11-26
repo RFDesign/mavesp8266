@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html>
+<head><title>RFDesign TXMOD</title>
+<meta name="viewport" content="initial-scale=1.0">
+<meta charset="utf-8">
+<link rel="stylesheet" href="s.css">
+<style>
+*{box-sizing:border-box}
+.hd img{box-sizing:content-box}
+input{padding: 10px;font-size: 17px;border:1px solid #aaaaaa}
+#localE,#localC,#confirmtest{width:100%}
+input.invalid {background-color: #ffdddd}/* Mark input boxes that gets an error on validation: */
+.tab{display: none} /* Hide all steps by default: */
+#msgbox{width:300px;height:auto;overflow:auto;background:#fff;position:absolute;left:50%;text-align:left;margin-left:-150px;margin-top:50px;opacity:0.0;display:none}
+#msgbox button {float:right;width:100px}
+/* Make circles that indicate the steps of the form: */
+.step{height:15px;width:15px;margin:0 2px;background-color:#bbbbbb;border:none;border-radius:50%;display:inline-block;opacity:0.5}
+.step.active{opacity:1}
+.task{background-image:linear-gradient(to top right,#f44242,#f47d41);color:#fff;border:none;padding:0;margin:10px 0;font-size:17px;border-radius:5px}
+.task p{padding:10px}
+#dets,#sdets{font-style:italic}#dets{display:none}
+/* Mark the steps that are finished and valid: */
+.step.finish{background-color:#303030}
+.left{float:right;color:#fff;padding:5px 10px}
+/*#prevBtn, #nextBtn {font-size:18px;color:#000;border:#333 2px solid}*/
+</style></head>
+<body>
+<div class="hd"><img src="logo.png"/><h1><a href="/">TXMOD</a></h1></div>
+<div class="b f">
+<div id="msgbox" class="b"><h2>Error</h2><p><span id="msg_text"></span> <span id="sdets" onclick="show_details()">See more..</span><p id="dets"></p></p><button onclick="close_window()">Close</button></div>
+<form id="regForm" action="/wiz" method="post" onclick="return false;">
+  <h2>First Run Wizard</h2>
+  
+  <!-- <font size=6>Tasks List:  &#10004;</font> -->
+  <div id=r0 class="task"><div id=t0 class="left"></div><p>Power on Radios and Link them</p></div>
+  <div id=r1 class="task"><div id=t1 class="left"></div><p>Radio NetworkID change</p></div>
+  <div id=r2 class="task"><div id=t2 class="left"></div><p>Encryption</p></div>
+  <div id=r3 class="task"><div id=t3 class="left"></div><p>Enable PPM passthru</p></div>
+  <div id=r4 class="task"><div id=t4 class="left"></div><p>Set PPM failsafe settings</p></div>
+  <div id=r5 class="task"><div id=t5 class="left"></div><p>PPM failsafe test</p></div>
+  
+    
+  <!-- One "tab" for each step in the form: -->
+  <div class="tab"><p>Power on Radios and Link them. Please ensure both radios (900x) have a solid GREEN LED, then press "Next". We will test the link to be sure.</p>
+  </div>
+  <div class="tab"><p>This step changes the Radio NetworkID, matching both Local and Remote radio.</p><p>This step will also temporarily disable any encryption and do a factory-default on both radios prior to setting your preferred NetID.</p>
+    <p><input placeholder="Local/Remote Radio NetworkID ...(0-255)" oninput="this.className = ''" name="localC" id="localC"></p>
+    <p><button type="button" id="cc" onclick="choosenetid()">Pick a random NetworkID for me.</button></p>
+  </div>
+  <div class="tab"><p>Enable encryption by setting new encryption key in both local and remote radio.</p>
+    <input placeholder="To Enable Encryption, type '1' here, To Disable Encryption, type '0' here, or press a button below." oninput="this.className = ''" name="localEE" id="localEE" style="display:none">
+    <!--<p><label for="localEE" onclick="enableencryption()"><input type="checkbox" name="localEE" id="localEE" value="1"/>Enable encryption</label></p>-->
+    <input placeholder="Local/remote radio encryption secret (32 Hexadecimal characters only, no punctuation)" oninput="this.className = ''" name="localE" id="localE" style="visibility:hidden">
+    <button type="button" id="rs" onclick="enableencryption()">Enable encryption</button> 
+    <button type="button" id="rs" onclick="disableencryption()">Disable encryption</button> 
+    <button type="button" id="rs" onclick="randomisesecret()">Enable and generate secret</button>
+  </div>
+  <div class="tab"><p>Enable PPM passthru (PPMIN on local radio, PPMOUT on remote radio):</p>
+    <input placeholder="Local Radio PPM IN..." oninput="this.className = ''" name="localPPMin" id="localPPMin" style="display:none" value="0">
+    <input placeholder="Remote Radio PPM OUT..." oninput="this.className = ''" name="remotePPMOUT" id="remotePPMOUT" style="display:none" value="0">
+    <p><button type="button" id="rs0" onclick="doppm(1)">Yes, enable PPM passthru</button></p>
+  </div>
+  <div class="tab"><p>Set PPM Failsafe?</p>
+                <p>This will allow you to record a snapshot of the current incoming PPM stream (right now!) and it will be used as the DEFAULT for PPM output (vehicle side) when the long-range 900x radios loose link, and the transmitter PPM is not available.</p>
+                <p>Please ensure your RC sticks and switches are set in the position you want for FAILSAFE. If using an Autopilot, we recommend RTL or Return-To-Launch. If not, we recommend settings that will keep your aircraft in slow circling stable flight for as long as possible.</p>
+                <p>Press one of the buttons below, then "Next" to save.</p>
+    <input placeholder="Remote Radio PPM FailSafe Default..." oninput="this.className = ''" name="remoteDefaultPPM" id="remoteDefaultPPM" style="display:none">
+    <p><button type="button" id="rs" onclick="doppmfailsafe(1)">Yes, Record PPM stream for PPM Failsafe for me when "Next" is clicked.</button>
+    <button type="button" id="rs" onclick="doppmfailsafe(0)">No, I am not using that feature.</button></p>
+  </div>
+  <div class="tab"><p>Are your PPM failsafe settings actually tested?</p>
+                   <p>Please do not turn your Transmitter or TXMOD off right now, or you will not be able to click 'Yes'. When this wizard is complete, please check what your aircraft actually does when the transmitter and TXMOD are turned OFF.</p>
+    <p><input placeholder="Have you Tested what happens when your TXMOD and Transmitter are turned OFF..." oninput="this.className = ''" name="confirmtest" id="confirmtest"></p>
+    <p><button type="button" id="rs" onclick="dotest()">Yes, I know this can crash my aircraft if I set it wrong.</button></p>
+
+  </div>
+  <div style="overflow:auto;">
+    <div style="float:right;margin-top:10px">
+      <button type="button" id="prevBtn" onclick="attemptNextPrev(-1)">Previous</button>
+      <button type="button" id="nextBtn" onclick="attemptNextPrev(1)">Next</button>
+    </div>
+  </div>
+  <!-- Circles which indicates the steps of the form: -->
+  <div style="text-align:center;margin-top:40px;">
+    <span class="step"></span>
+    <span class="step"></span>
+    <span class="step"></span>
+    <span class="step"></span>
+    <span class="step"></span>
+    <span class="step"></span>
+  </div>
+</form>
+
+<script>
+var currentTab = 0; // Current tab is set to be the first tab (0)
+showTab(currentTab); // Display the crurrent tab
+
+
+function showTab(n) {
+
+
+  t = document.getElementById("t"+(currentTab-1));
+  if ( t != null ) t.innerHTML = "&#10004;";
+
+  r = document.getElementById("r"+(currentTab-1));
+  if ( r != null )  r.style.backgroundImage='linear-gradient(to top right,#41f47f,#41e2f4)'	; //green
+
+
+  // This function will display the specified tab of the form...
+  var x = document.getElementsByClassName("tab");
+  x[n].style.display = "block";
+  //... and fix the Previous/Next buttons:
+  if (n == 0) {
+    document.getElementById("prevBtn").style.display = "none";
+  } else {
+    document.getElementById("prevBtn").style.display = "inline";
+  }
+  if (n == (x.length - 1)) {
+    document.getElementById("nextBtn").innerHTML = "Finish";
+  } else {
+    document.getElementById("nextBtn").innerHTML = "Next";
+  }
+  if (n == (x.length )) {
+	t = document.getElementById("t"+(currentTab));
+	if ( t != null ) t.innerHTML = "&#10004;";
+	r = document.getElementById("r"+(currentTab));
+	if ( r != null )  r.style.backgroundImage='linear-gradient(to top right,#41f47f,#41e2f4)';
+  }
+  //... and run a function that will display the correct step indicator:
+  fixStepIndicator(n);
+
+}
+
+// user requests, then we trigger ajax event, which actually changes tab with nextPrev on success.
+var direction;
+function attemptNextPrev(n) { 
+
+
+  // Exit the function if any field in the current tab is invalid:
+  if (n == 1 && !validateForm()) return false;
+
+  direction = n; // save for after ajax so we know whih direction to move.
+
+  // make Next button say "working"...
+  if ( n == 1 ) {  // forward
+      document.getElementById("nextBtn").innerHTML = "Working...";
+
+   // attempt ajax to server and this will hook the showTab to be done on return from that.
+   // saveTab = currentTab; // incase we need to stay on current tab.
+   // currentTab = currentTab + n; // try to increment/decrement
+   sendData(currentTab + n);
+  }
+  if ( n == -1 ) {  // back
+      document.getElementById("prevBtn").innerHTML = "Working...";
+
+   // don't attempt to hit the server on "previous" button, just change tab immediately
+    nextPrev(direction);
+  }
+} 
+
+function unfade(element) {
+    var op = 0.1;  // initial opacity
+    element.style.display = 'block';
+    var timer = setInterval(function () {
+        if (op >= 1){
+            clearInterval(timer);
+        }
+        element.style.opacity = op;
+        element.style.filter = 'alpha(opacity=' + op * 100 + ")";
+        op += op * 0.1;
+    }, 10);
+}
+
+function fade(element) {
+    var op = 1;  // initial opacity
+    var timer = setInterval(function () {
+        if (op <= 0.1){
+            clearInterval(timer);
+            element.style.display = 'none';
+  document.getElementById("sdets").style.display = "block";
+  document.getElementById("dets").style.display = "none";
+        }
+        element.style.opacity = op;
+        element.style.filter = 'alpha(opacity=' + op * 100 + ")";
+        op -= op * 0.1;
+    }, 50);
+}
+
+function alert_window(msg, det)
+{
+  document.getElementById("msg_text").innerHTML = msg;
+  document.getElementById("dets").innerHTML = det;
+  unfade(document.getElementById("msgbox"));
+}
+
+function close_window() {
+  fade(document.getElementById("msgbox"));
+}
+function show_details() {
+  document.getElementById("sdets").style.display = "none";
+  document.getElementById("dets").style.display = "block";
+}
+
+
+function noTabChange(n,t) {
+
+  alert_window("Sorry, something is not right with the radio comms. Please, check radio link is still up and retry. \r\n",t);
+
+  // make Next button say "working"...
+  if ( n == 1 ) {  // forward
+      document.getElementById("nextBtn").innerHTML = "Next";
+  }
+  if ( n == -1 ) {  // back
+      document.getElementById("prevBtn").innerHTML = "Previous";
+  }
+
+}
+function nextPrev(n) {
+
+  // make Next button say "working"...
+  if ( n == 1 ) {  // forward
+      document.getElementById("nextBtn").innerHTML = "Next";
+  }
+  if ( n == -1 ) {  // back
+      document.getElementById("prevBtn").innerHTML = "Previous";
+      //document.getElementById("prevBtn").style.backgroundImage='linear-gradient(to top right,#41f47f,#41e2f4)'; //green
+  }
+
+  // This function will figure out which tab to display
+  var x = document.getElementsByClassName("tab");
+
+  // Hide the current tab:
+  x[currentTab].style.display = "none";
+
+ // Increase or decrease the current tab by 1:
+  currentTab = currentTab + n; // try to increment/decrement
+
+
+  // if you have reached the end of the form...
+  if (currentTab == x.length) {
+    // ... the form gets submitted:
+    //document.getElementById("regForm").submit();
+
+      document.getElementById("nextBtn").innerHTML = "WIZARD is completed, Thank you!";
+	  document.getElementById("nextBtn").addEventListener('click', function (e) {
+			window.location.href = '/';
+		}, false);
+      //document.getElementById("nextBtn").style.backgroundColor = "#4c9caf";//blue gray.
+
+        
+         t = document.getElementById("t"+(currentTab-1));
+          if ( t != null ) t.innerHTML = "&#10004;";
+
+          r = document.getElementById("r"+(currentTab-1));
+          if ( r != null )  r.style.backgroundImage='linear-gradient(to top right,#41f47f,#41e2f4)'	; //green
+
+
+    return false;
+  } 
+  
+  if (currentTab > x.length)
+  {
+	window.location.href = "/";
+  }
+
+  showTab(currentTab); // stay on current tab if the showTab() returns false.
+}
+
+function validateForm() {
+  // This function deals with validation of the form fields
+  var x, y, i, valid = true;
+  x = document.getElementsByClassName("tab");
+  y = x[currentTab].getElementsByTagName("input");
+  // A loop that checks every input field in the current tab:
+  for (i = 0; i < y.length; i++) {
+    // If a field is empty...
+    if (y[i].value == "") {
+      // add an "invalid" class to the field:
+      y[i].className += " invalid";
+      // and set the current valid status to false
+      valid = false;
+    }
+  }
+  // If the valid status is true, mark the step as finished and valid:
+  if (valid) {
+    f = document.getElementsByClassName("step")[currentTab];
+    if ( f != null ) f.className += " finish";
+  }
+  return valid; // return the valid status
+}
+
+function fixStepIndicator(n) {
+  // This function removes the "active" class of all steps...
+  var i, x = document.getElementsByClassName("step");
+  for (i = 0; i < x.length; i++) {
+    x[i].className = x[i].className.replace(" active", "");
+  }
+  //... and adds the "active" class on the current step:
+  if ( x[n] != null ) x[n].className += " active";
+}
+
+function choosenetid() {  // 0-255
+    document.getElementById("localC").value =  Math.floor((Math.random() * 255) );
+} 
+
+function disableencryption() { 
+
+  // disable encryption
+  document.getElementById("localEE").value = "0";
+  document.getElementById("localE").value = " "; // overwrite the validator on the unused field.
+ document.getElementById("localE").className = ''; // validator color too.
+ document.getElementById("localE").style.visibility = "hidden";
+ 
+  document.getElementById("localEE").checked = false;
+}
+function enableencryption() { 
+
+  // enable encryption
+  document.getElementById("localEE").value = "1";
+  document.getElementById("localE").value = "";
+  document.getElementById("localE").style.visibility = "visible";
+}
+function randomisesecret() {  // random 32 hex characters string, 
+  enableencryption();
+  // enable encryption
+  document.getElementById("localEE").value = "1";
+ 
+  var text = "";
+  var possible = "ABCDEF0123456789"; // hexadecimal.
+  for (var i = 0; i < 32; i++) text += possible.charAt(Math.floor(Math.random() * possible.length));
+
+  document.getElementById("localE").value = text;
+} 
+var did_user_enable_ppm_passthrough = -1
+function doppm(state) { 
+
+    did_user_enable_ppm_passthrough = state;
+
+    document.getElementById("localPPMin").value =  state;
+    document.getElementById("remotePPMOUT").value =  state;
+    
+    document.getElementById("rs0").innerHTML = state == 1 ? "Disable PPM passthru" : "Yes, enable PPM passthru";
+    document.getElementById("rs0").addEventListener('click', function(e) {
+      doppm(state == 1 ? 0 : 1);
+      }, false);
+} 
+
+function doppmfailsafe(state) { 
+
+    if ( state == 1 ) { 
+
+        if ( did_user_enable_ppm_passthrough == 1 ) { 
+            document.getElementById("remoteDefaultPPM").value =  1;
+        } else { 
+            alert_window("You have PPM-passthrough disabled on the previous page. This means it is not possible to set the failsafe.", "Change de PPM-passthrough setting or click \"No\"");
+            document.getElementById("remoteDefaultPPM").value =  0;
+        } 
+    } else { 
+         document.getElementById("remoteDefaultPPM").value =  0;
+    }
+
+} 
+function dotest() { 
+    document.getElementById("confirmtest").value =  "Yes";
+}
+
+// Access the form element...
+var form = document.getElementById("regForm");
+
+// this is how we push form data to server
+function sendData(page) {
+
+    var XHR = new XMLHttpRequest();
+    XHR.timeout = 30000;
+    // Bind the FormData object and the form element
+    var FD = new FormData(form);
+    FD.append("page", page);
+    // Define what happens on successful data submission
+    XHR.addEventListener("load", function(event) {
+      //alert(event.target.responseText);
+
+        var t = event.target.responseText;
+        if ( t.startsWith("SUCCESS")) {
+         nextPrev(direction);
+         return;
+        }
+        if ( t.includes("Saved")) {
+         nextPrev(direction);
+         return;
+        }
+        noTabChange(direction,t);
+        return;
+
+    });
+    // Define what happens in case of error
+    XHR.addEventListener("error", function(event) {
+      alert_window('Something went wrong while sending your request.\r\nVerify your TXMOD is operational and power-cycle it if necessary.', event.message);
+    });
+    // Set up our request
+    XHR.open("POST", "/wiz");
+    // The data sent is what the user provided in the form
+    XHR.send(FD);
+};
+
+
+// on-page-load setup this....
+window.addEventListener("load", function () {
+
+  // ...and take over its submit event for that too. 
+  form.addEventListener("submit", function (event) {
+    event.preventDefault();
+
+    sendData(6);
+  });
+});
+
+</script>
+</div>
+</body>
+</html>
+
+

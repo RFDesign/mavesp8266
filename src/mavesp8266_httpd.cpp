@@ -121,6 +121,8 @@ const char* kFlashMaps[7] = {
 #define BUILD_DATE_STRING __DATE__
 #define BUILD_TIME_STRING __TIME__
 
+void WebServerSend(int code, const char* content_type, const String& content);
+
 static uint32_t flash = 0;
 static char paramCRC[12] = {""};
 
@@ -137,6 +139,8 @@ ESP8266HTTPUpdateServer httpUpdater;
 
 //holds the current upload, if there is one, except OTA binary uploads, done elsewhere.
 File fsUploadFile;
+
+static bool gWizSaveReplyRequired = false;
 
 //---------------------------------------------------------------------------------
 void setNoCacheHeaders() {
@@ -865,7 +869,7 @@ void wiz_param_saver( String ParamID, String ParamVAL ) {
         message = "FAIL param saving to REMOTE 900x radio. RT ";
         message += ParamID+"->"+ParamVAL;
         setNoCacheHeaders();
-        webServer.send(201, FPSTR(kTEXTHTML), message);
+        WebServerSend(201, FPSTR(kTEXTHTML), message);
         return;
     }
     // saving to local failed, advise of that          
@@ -874,7 +878,7 @@ void wiz_param_saver( String ParamID, String ParamVAL ) {
         message = "FAIL param saving to LOCAL 900x radio. AT ";
         message += ParamID+"->"+ParamVAL;
         setNoCacheHeaders();
-        webServer.send(202, FPSTR(kTEXTHTML), message);
+        WebServerSend(202, FPSTR(kTEXTHTML), message);
         return;
     } 
     //if ( retval == 200 ) {
@@ -883,21 +887,41 @@ void wiz_param_saver( String ParamID, String ParamVAL ) {
         debug_serial_println("E2");
         setNoCacheHeaders();
         debug_serial_println(message);
-        webServer.send(200, FPSTR(kTEXTHTML), message);
+        WebServerSend(200, FPSTR(kTEXTHTML), message);
         return;
     //}
 
 }
 
+void WebServerSendError(int code, const String& content = String(""))
+{
+	printf("WebServerSendError %d, %s\n", code, content.c_str());
+}
+
+void WebServerSend(int code, const char* content_type = NULL, const String& content = String(""))
+{
+	if (gWizSaveReplyRequired)
+	{
+		printf("WebServerSend %d, %s\n", code, content.c_str());
+		if (code != 200)
+		{
+			WebServerSendError(code, content);
+		}
+		webServer.send(200, content_type, content);
+		gWizSaveReplyRequired = false;
+	}
+}
 
 //---------------------------------------------------------------------------------
 // for /wiz url
 void handle_wiz_save() // accept updated param/s via POST, save them, then display standard 'edit' form with new data.
 {
     debug_serial_println("handle_wiz_save()");
+    gWizSaveReplyRequired = true;
+
     if(webServer.args() == 0) {
         // no args, just return 200/ok
-        webServer.send(200, FPSTR(kTEXTHTML), "ok");
+    	WebServerSend(200, FPSTR(kTEXTHTML), "ok");
         return;
     }
     bool ok = false;
@@ -935,17 +959,20 @@ void handle_wiz_save() // accept updated param/s via POST, save them, then displ
             retval = 201;
         }
         setNoCacheHeaders();
-        webServer.send(retval, FPSTR(kTEXTHTML), message);
+        WebServerSend(retval, FPSTR(kTEXTHTML), message);
         return;
 
     }    
     //NETID
     if((page == 2) && webServer.hasArg("localC")) {
         //ok = true;
+    	printf("Handling NETID page\n");
+
         int w1 = webServer.arg("localC").toInt(); // convert to int and back removes any whitespace and \r\n etc.
         String Sw1 = String(w1);
 
         // disable encryption first and reboot 
+    	printf("Disabling encryption and rebooting\n");
         int retval = wiz_param_helper( PARAM_ENCRYPT_STR, "0" , true); 
 		    delay(500);
         if (retval != 200 ) {
@@ -955,7 +982,8 @@ void handle_wiz_save() // accept updated param/s via POST, save them, then displ
                 message += "FAILED to set S15=0 on local radio.";
             }
 		    setNoCacheHeaders();
-		    webServer.send(retval, FPSTR(kTEXTHTML), message);
+		    WebServerSend(retval, FPSTR(kTEXTHTML), message);
+	    	printf("Failed to set encryption to 0\n");
 		    return;
         }
 
@@ -965,6 +993,7 @@ void handle_wiz_save() // accept updated param/s via POST, save them, then displ
 
         // factory default the radio/s to (a) put them in a good state, and (b) clear any encryption key for later...
         // disable encryption via factory default and reboot
+        printf("Setting modems to factory defaults\n");
         retval = wiz_param_helper( "&F", "" , true); 
 		    delay(250);
         if (retval != 200) {        
@@ -974,22 +1003,25 @@ void handle_wiz_save() // accept updated param/s via POST, save them, then displ
                 message += "FAILED to factory-default local radio.";
             }
 		    setNoCacheHeaders();
-		    webServer.send(retval, FPSTR(kTEXTHTML), message);
+		    WebServerSend(retval, FPSTR(kTEXTHTML), message);
+	    	printf("Failed to set mdm to factory defaults\n");
 		    return;
         }
 
+        printf("Setting STATLED param\n");
         retval = r900x_savesingle_param_and_verify_more("AT", PARAM_STATLED_STR, "1", true);
 		    delay(250);
         if (retval <= 0) {
             message += "FAILED to set local radio ATS21 to 1";
 		    setNoCacheHeaders();
-		    webServer.send(retval, FPSTR(kTEXTHTML), message);
+		    WebServerSend(retval, FPSTR(kTEXTHTML), message);
 		    return;
         }
 
+        printf("Setting NETID param\n");
 		// after a factory-default, THEN set the netid in both radio/s as the first step in the process.
         wiz_param_saver( PARAM_NETID_STR, Sw1 ); // non-returning, emits http response, saves and reboots radios after
-        
+        printf("Done\n");
     }
 
     // ENCRYPTION
@@ -1093,14 +1125,14 @@ void handle_wiz_save() // accept updated param/s via POST, save them, then displ
                 message += "FAILED to set frame len on local radio.";
               }
               setNoCacheHeaders();
-              webServer.send(retval, FPSTR(kTEXTHTML), message);
+              WebServerSend(retval, FPSTR(kTEXTHTML), message);
               return;
             }
           }
         } else {  // failed to read the remote device board revision
           message += "FAILED to read Board Rev on REMOTE 900x radio, RTI4";
           setNoCacheHeaders();
-          webServer.send(retval, FPSTR(kTEXTHTML), message);
+          WebServerSend(retval, FPSTR(kTEXTHTML), message);
           return;
         }
 
@@ -1115,7 +1147,7 @@ void handle_wiz_save() // accept updated param/s via POST, save them, then displ
             message += "FAILED to set air speed on local radio.";
           }
           setNoCacheHeaders();
-          webServer.send(retval, FPSTR(kTEXTHTML), message);
+          WebServerSend(retval, FPSTR(kTEXTHTML), message);
           return;
         }
 
@@ -1125,7 +1157,7 @@ void handle_wiz_save() // accept updated param/s via POST, save them, then displ
                 message += "FAILED param saving to REMOTE 900x radio. RT S17->"+String(w4);
                 setNoCacheHeaders();
                 debug_serial_println(message);
-                webServer.send(201, FPSTR(kTEXTHTML), message);
+                WebServerSend(201, FPSTR(kTEXTHTML), message);
                 return;
         }
 
@@ -1138,7 +1170,7 @@ void handle_wiz_save() // accept updated param/s via POST, save them, then displ
                 message += "FAILED param saving to LOCAL 900x radio. AT S16->"+String(w3);
                 setNoCacheHeaders();
                 debug_serial_println(message);
-                webServer.send(202, FPSTR(kTEXTHTML), message);
+                WebServerSend(202, FPSTR(kTEXTHTML), message);
                 return;
         }
        
@@ -1147,7 +1179,7 @@ void handle_wiz_save() // accept updated param/s via POST, save them, then displ
             message = "SUCCESS param saving to LOCAL/REMOTE 900x radio. AT/RT S16/17->";
             setNoCacheHeaders();
             debug_serial_println(message);
-            webServer.send(200, FPSTR(kTEXTHTML), message);
+            WebServerSend(200, FPSTR(kTEXTHTML), message);
             return;
         }
 
@@ -1170,7 +1202,7 @@ void handle_wiz_save() // accept updated param/s via POST, save them, then displ
                     message += "FAILED param saving to REMOTE 900x radio. RT &R";
                     setNoCacheHeaders();
                     debug_serial_println(message);
-                    webServer.send(201, FPSTR(kTEXTHTML), message);
+                    WebServerSend(201, FPSTR(kTEXTHTML), message);
                     return;
             }
         }
@@ -1197,7 +1229,7 @@ void handle_wiz_save() // accept updated param/s via POST, save them, then displ
     debug_serial_println("E");
     setNoCacheHeaders();
     debug_serial_println(message);
-    webServer.send(200, FPSTR(kTEXTHTML), message);
+    WebServerSend(200, FPSTR(kTEXTHTML), message);
     //} else {
     //    returnFail(kBADARG);
     //}
